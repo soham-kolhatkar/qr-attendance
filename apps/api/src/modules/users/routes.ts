@@ -2,21 +2,30 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { INSTITUTE_ROLES } from '../../db/schema.js';
 import {
+  designationSchema,
   errorResponseSchema,
+  fullNameSchema,
   idParamsSchema,
+  nonEmptyPatch,
   paginated,
   paginationQuerySchema,
   passwordSchema,
+  phoneSchema,
   usernameSchema,
 } from '../../lib/validation.js';
 import { getInstituteAuth, guard } from '../../plugins/auth.js';
-import { userDtoSchema } from './dto.js';
+import { managedUserDtoSchema } from './dto.js';
 import { createUser, getUser, listUsers, resetPassword, updateUser } from './service.js';
 
-const roleSchema = z.enum(INSTITUTE_ROLES);
+const staffRoleSchema = z.enum(['admin', 'hod', 'faculty']);
 const security = [{ bearerAuth: [] }];
+const tags = ['users'];
 
-/** Institute-admin endpoints for managing the institute's own users. */
+/**
+ * Institute-admin endpoints for every account in the institute. Staff are created here;
+ * students are created through /v1/students (they need a class) but are listed,
+ * disabled and have passwords reset here like everyone else.
+ */
 export const userRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook('preHandler', guard('admin'));
 
@@ -24,20 +33,24 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     '/',
     {
       schema: {
-        tags: ['users'],
-        summary: 'Create a user (admin, HOD, faculty or student)',
+        tags,
         security,
+        summary: 'Create a staff account (admin, HOD or faculty)',
         body: z.object({
-          role: roleSchema,
+          role: staffRoleSchema,
           username: usernameSchema,
-          fullName: z.string().trim().min(1).max(200),
+          fullName: fullNameSchema,
           email: z.email().optional(),
-          phone: z.string().trim().min(5).max(20).optional(),
+          phone: phoneSchema.optional(),
           password: passwordSchema.optional().describe('Omit to generate a temporary password'),
           mustChangePassword: z.boolean().optional().describe('Defaults to true'),
+          unitId: z.uuid().optional().describe('Department / home unit. Required for HODs: the unit they manage'),
+          designation: designationSchema.optional().describe('e.g. Assistant Professor'),
         }),
         response: {
-          201: z.object({ user: userDtoSchema, temporaryPassword: z.string().optional().describe('Shown only once') }),
+          201: z.object({ user: managedUserDtoSchema, temporaryPassword: z.string().optional().describe('Shown only once') }),
+          400: errorResponseSchema,
+          404: errorResponseSchema,
           409: errorResponseSchema,
         },
       },
@@ -53,15 +66,15 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     '/',
     {
       schema: {
-        tags: ['users'],
-        summary: 'List and search users in your institute',
+        tags,
         security,
+        summary: 'List and search all accounts in your institute',
         querystring: paginationQuerySchema.extend({
-          role: roleSchema.optional(),
+          role: z.enum(INSTITUTE_ROLES).optional(),
           status: z.enum(['active', 'disabled']).optional(),
           q: z.string().trim().min(1).optional().describe('Search username, name or email'),
         }),
-        response: { 200: paginated(userDtoSchema) },
+        response: { 200: paginated(managedUserDtoSchema) },
       },
     },
     (req) => listUsers(app.db, getInstituteAuth(req).instituteId, req.query),
@@ -71,11 +84,11 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     '/:id',
     {
       schema: {
-        tags: ['users'],
-        summary: 'Get one user',
+        tags,
         security,
+        summary: 'Get one account',
         params: idParamsSchema,
-        response: { 200: userDtoSchema, 404: errorResponseSchema },
+        response: { 200: managedUserDtoSchema, 404: errorResponseSchema },
       },
     },
     (req) => getUser(app.db, getInstituteAuth(req).instituteId, req.params.id),
@@ -85,20 +98,22 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     '/:id',
     {
       schema: {
-        tags: ['users'],
-        summary: 'Update details, change role, or enable/disable a user',
+        tags,
         security,
+        summary: 'Update details, change a staff role or unit, or enable/disable an account',
         params: idParamsSchema,
-        body: z
-          .object({
-            fullName: z.string().trim().min(1).max(200).optional(),
+        body: nonEmptyPatch(
+          z.object({
+            fullName: fullNameSchema.optional(),
             email: z.email().nullable().optional(),
-            phone: z.string().trim().min(5).max(20).nullable().optional(),
-            role: roleSchema.optional(),
+            phone: phoneSchema.nullable().optional(),
+            role: staffRoleSchema.optional(),
             status: z.enum(['active', 'disabled']).optional(),
-          })
-          .refine((b) => Object.values(b).some((v) => v !== undefined), 'Provide at least one field'),
-        response: { 200: userDtoSchema, 400: errorResponseSchema, 404: errorResponseSchema },
+            unitId: z.uuid().nullable().optional().describe('Staff only'),
+            designation: designationSchema.nullable().optional().describe('Staff only'),
+          }),
+        ),
+        response: { 200: managedUserDtoSchema, 400: errorResponseSchema, 404: errorResponseSchema },
       },
     },
     (req) => updateUser(app.db, getInstituteAuth(req), req.params.id, req.body, req.ip),
@@ -108,9 +123,9 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     '/:id/reset-password',
     {
       schema: {
-        tags: ['users'],
-        summary: 'Issue a temporary password and sign the user out everywhere',
+        tags,
         security,
+        summary: 'Issue a temporary password and sign the user out everywhere',
         params: idParamsSchema,
         response: { 200: z.object({ temporaryPassword: z.string() }), 404: errorResponseSchema },
       },

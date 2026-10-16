@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -16,14 +17,27 @@ import type { Config } from './config.js';
 import type { Db } from './db/client.js';
 import { AppError } from './lib/errors.js';
 import { authRoutes } from './modules/auth/routes.js';
+import { subjectRoutes, termRoutes } from './modules/catalog/routes.js';
+import { groupRoutes } from './modules/groups/routes.js';
+import { importRoutes } from './modules/imports/routes.js';
 import { platformRoutes } from './modules/institutes/routes.js';
 import { meRoutes } from './modules/me/routes.js';
+import { offeringRoutes } from './modules/offerings/routes.js';
+import { structureRoutes } from './modules/structure/routes.js';
+import { studentRoutes } from './modules/students/routes.js';
 import { userRoutes } from './modules/users/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     config: Config;
+  }
+  interface FastifyContextConfig {
+    /**
+     * The route takes a multipart "file" upload. Only affects the OpenAPI docs (so
+     * /docs shows a file picker); the handler itself reads and checks the file.
+     */
+    fileUpload?: boolean;
   }
 }
 
@@ -48,13 +62,24 @@ export async function buildApp({ config, db }: { config: Config; db: Db }) {
   // Limits are opted into per route. The preHandler hook runs after body parsing so
   // routes can key limits on body fields (e.g. the login username).
   await app.register(rateLimit, { global: false, hook: 'preHandler' });
+  // Spreadsheet uploads for bulk import.
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 5 } });
 
   await app.register(swagger, {
     openapi: {
       info: { title: 'QR Attendance API', version: '1.0.0' },
       components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } },
     },
-    transform: jsonSchemaTransform,
+    transform: (data) => {
+      const result = jsonSchemaTransform(data);
+      if (!data.route.config?.fileUpload) return result;
+      const fileBody = {
+        type: 'object',
+        required: ['file'],
+        properties: { file: { type: 'string', format: 'binary', description: '.xlsx or .csv file' } },
+      };
+      return { ...result, schema: { ...result.schema, body: fileBody } };
+    },
   });
   await app.register(swaggerUi, { routePrefix: '/docs' });
 
@@ -82,6 +107,13 @@ export async function buildApp({ config, db }: { config: Config; db: Db }) {
   await app.register(meRoutes, { prefix: '/v1' });
   await app.register(platformRoutes, { prefix: '/v1/platform' });
   await app.register(userRoutes, { prefix: '/v1/users' });
+  await app.register(structureRoutes, { prefix: '/v1/structure' });
+  await app.register(groupRoutes, { prefix: '/v1/groups' });
+  await app.register(studentRoutes, { prefix: '/v1/students' });
+  await app.register(termRoutes, { prefix: '/v1/terms' });
+  await app.register(subjectRoutes, { prefix: '/v1/subjects' });
+  await app.register(offeringRoutes, { prefix: '/v1/offerings' });
+  await app.register(importRoutes, { prefix: '/v1/imports' });
 
   return app;
 }

@@ -18,6 +18,19 @@ export const passwordSchema = z.string().min(8, 'Password must be at least 8 cha
 
 export const idParamsSchema = z.object({ id: z.uuid() });
 
+export const fullNameSchema = z.string().trim().min(1).max(200);
+export const phoneSchema = z.string().trim().min(5).max(20);
+export const rollNoSchema = z.string().trim().min(1).max(20);
+export const designationSchema = z.string().trim().min(1).max(100);
+
+/** Display names for levels, units, groups, terms, subjects. */
+export const nameSchema = z.string().trim().min(1).max(100);
+
+/** For PATCH bodies: at least one field must be present. */
+export function nonEmptyPatch<T extends z.ZodObject>(schema: T) {
+  return schema.refine((b) => Object.values(b).some((v) => v !== undefined), 'Provide at least one field');
+}
+
 export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),

@@ -11,15 +11,26 @@ describe('user management (institute admin)', () => {
       method: 'POST',
       url: '/v1/users',
       headers: bearer(admin),
-      payload: { role: 'student', username: '2024COMP001', fullName: 'Asha Patil' },
+      payload: { role: 'faculty', username: 'EMP042', fullName: 'Asha Patil', designation: 'Lecturer' },
     });
     expect(res.statusCode).toBe(201);
     const { user, temporaryPassword } = res.json();
-    expect(user).toMatchObject({ username: '2024comp001', role: 'student', mustChangePassword: true });
+    expect(user).toMatchObject({ username: 'emp042', role: 'faculty', mustChangePassword: true, designation: 'Lecturer' });
     expect(temporaryPassword).toMatch(/^[A-Za-z2-9]{10}$/);
 
-    const tokens = await login(ctx.app, { instituteCode: 'ALPHA', username: '2024comp001', password: temporaryPassword });
+    const tokens = await login(ctx.app, { instituteCode: 'ALPHA', username: 'emp042', password: temporaryPassword });
     expect(tokens.accessToken).toBeTypeOf('string');
+  });
+
+  it('sends students to /v1/students, since they need a class', async () => {
+    const { admin } = await setupInstitute(ctx.app, ctx.db);
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/v1/users',
+      headers: bearer(admin),
+      payload: { role: 'student', username: 'stu1', fullName: 'Someone' },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it('rejects duplicate usernames within an institute', async () => {
@@ -29,7 +40,7 @@ describe('user management (institute admin)', () => {
       method: 'POST',
       url: '/v1/users',
       headers: bearer(admin),
-      payload: { role: 'student', username: 'PROF.A', fullName: 'Someone' },
+      payload: { role: 'faculty', username: 'PROF.A', fullName: 'Someone' },
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().error.code).toBe('USERNAME_TAKEN');
