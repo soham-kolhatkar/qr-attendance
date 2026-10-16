@@ -216,3 +216,22 @@ describe('updating users', () => {
     expect(me.json().user.mustChangePassword).toBe(true);
   });
 });
+
+describe('staff directory', () => {
+  it('lists active teaching staff for all staff, without contact details, and not for students', async () => {
+    const { admin } = await setupInstitute(ctx.app, ctx.db);
+    await createUserAs(ctx.app, admin, { role: 'faculty', username: 'prof.a', fullName: 'Asha' });
+    const off = await createUserAs(ctx.app, admin, { role: 'faculty', username: 'prof.b', fullName: 'Bina' });
+    await ctx.app.inject({ method: 'PATCH', url: `/v1/users/${off.id}`, headers: bearer(admin), payload: { status: 'disabled' } });
+    await createUserAs(ctx.app, admin, { role: 'student', username: 'stu1' });
+
+    const faculty = await login(ctx.app, { instituteCode: 'ALPHA', username: 'prof.a' });
+    const res = await ctx.app.inject({ method: 'GET', url: '/v1/directory/staff', headers: bearer(faculty) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().map((u: { username: string }) => u.username)).toEqual(['admin', 'prof.a']);
+    expect(res.json()[0].email).toBeUndefined();
+
+    const student = await login(ctx.app, { instituteCode: 'ALPHA', username: 'stu1' });
+    expect((await ctx.app.inject({ method: 'GET', url: '/v1/directory/staff', headers: bearer(student) })).statusCode).toBe(403);
+  });
+});

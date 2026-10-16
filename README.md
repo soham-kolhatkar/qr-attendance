@@ -7,9 +7,10 @@ the security design and the feature roadmap.
 ## Repository layout
 
 ```
-apps/api      Backend API (Node 24, Fastify, PostgreSQL)   ← Features 1–3
-apps/web      Faculty projector page + dashboards          (Feature 4)
-apps/mobile   Student app, Expo React Native               (Feature 5)
+apps/api      Backend API (Node 24, Fastify, PostgreSQL)    ← Features 1–3
+apps/web      Web app: admin screens, teacher sessions,     ← Feature 4
+              full-screen projector QR (React, Mantine)
+apps/mobile   Student app, Expo React Native                (Feature 5)
 docs/         Plan and design notes
 ```
 
@@ -27,6 +28,9 @@ cp .env.example .env             # then set JWT_SECRET and the seed password
 npm run db:migrate               # create tables
 npm run db:seed                  # platform owner + a DEMO institute with sample data
 npm run dev                      # API on http://localhost:3000
+
+# in a second terminal, from the repository root
+npm run web:dev                  # web app on http://localhost:5173
 ```
 
 - Interactive API docs: http://localhost:3000/docs
@@ -40,7 +44,12 @@ npm run dev                      # API on http://localhost:3000
 The demo structure is `Department › Year › Division`, with Computer Engineering › SY ›
 Div A and Div B. Each institute defines its own levels, so this is just an example.
 
-**Try an attendance session** (in http://localhost:3000/docs):
+**Try it in the web app** (http://localhost:5173): sign in as `admin` to see the setup
+screens, or as `prof.sharma` → **My classes** → **Take attendance** → **Show QR on
+projector**. Scanning needs the student app (Feature 5); until then you can simulate a
+student phone in the API docs as below.
+
+**Try an attendance session through the API** (in http://localhost:3000/docs):
 1. Log in as `prof.sharma`. Find the CS301 offering with `GET /v1/offerings?mine=true`,
    then start a session with `POST /v1/sessions`, giving it that `offeringId`.
 2. `GET /v1/sessions/{id}/qr` gives the code the projector would show right now.
@@ -53,6 +62,13 @@ Div A and Div B. Each institute defines its own levels, so this is just an examp
 
 ```bash
 npm run db:up
-npm run api:test        # runs against a separate qr_attendance_test database
+npm run api:test        # API integration tests (separate qr_attendance_test database)
 npm run api:typecheck
+npm run web:test        # web unit tests
+npm run e2e             # real-browser end-to-end tests; screenshots in apps/web/e2e/screenshots
 ```
+
+The first `npm run e2e` needs a browser: `cd apps/web && npx playwright install chromium`.
+
+After changing the API, regenerate the web app's typed client with
+`npm run gen:api -w apps/web`; the web type-check then flags anything that no longer fits.

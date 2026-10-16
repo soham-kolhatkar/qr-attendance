@@ -27,7 +27,7 @@ import { meRoutes } from './modules/me/routes.js';
 import { offeringRoutes } from './modules/offerings/routes.js';
 import { structureRoutes } from './modules/structure/routes.js';
 import { studentRoutes } from './modules/students/routes.js';
-import { userRoutes } from './modules/users/routes.js';
+import { directoryRoutes, userRoutes } from './modules/users/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -132,6 +132,7 @@ export async function buildApp({ config, db, clock = Date.now }: { config: Confi
   await app.register(meRoutes, { prefix: '/v1' });
   await app.register(platformRoutes, { prefix: '/v1/platform' });
   await app.register(userRoutes, { prefix: '/v1/users' });
+  await app.register(directoryRoutes, { prefix: '/v1/directory' });
   await app.register(structureRoutes, { prefix: '/v1/structure' });
   await app.register(groupRoutes, { prefix: '/v1/groups' });
   await app.register(studentRoutes, { prefix: '/v1/students' });

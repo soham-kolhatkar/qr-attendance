@@ -18,6 +18,10 @@
     "db:down": "docker compose down",
     "api:dev": "npm run dev -w apps/api",
     "api:test": "npm test -w apps/api",
-    "api:typecheck": "npm run typecheck -w apps/api"
+    "api:typecheck": "npm run typecheck -w apps/api",
+    "web:dev": "npm run dev -w apps/web",
+    "web:build": "npm run build -w apps/web",
+    "web:test": "npm test -w apps/web",
+    "e2e": "npm run e2e -w apps/web"
   }
 }
