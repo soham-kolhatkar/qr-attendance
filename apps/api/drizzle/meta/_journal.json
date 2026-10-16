@@ -8,6 +8,13 @@
       "when": 1792155635134,
       "tag": "0000_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792157905008,
+      "tag": "0001_academic_structure",
+      "breakpoints": true
     }
   ]
 }

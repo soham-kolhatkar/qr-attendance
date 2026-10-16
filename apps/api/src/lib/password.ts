@@ -8,6 +8,16 @@ export function hashPassword(password: string): Promise<string> {
   return hash(password, ARGON2_OPTIONS);
 }
 
+/**
+ * Lighter Argon2id for passwords *we* generate. They are random (10 chars from a
+ * 55-symbol alphabet ≈ 58 bits), so slow hashing adds nothing against guessing, and
+ * users must replace them at first login. This keeps a 10,000-student import fast.
+ * verifyPassword works unchanged because the parameters are stored in the hash.
+ */
+export function hashTemporaryPassword(password: string): Promise<string> {
+  return hash(password, { memoryCost: 4096, timeCost: 1, parallelism: 1 });
+}
+
 export async function verifyPassword(passwordHash: string, password: string): Promise<boolean> {
   try {
     return await verify(passwordHash, password);

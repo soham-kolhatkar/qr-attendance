@@ -17,6 +17,11 @@ export const userDtoSchema = z.object({
 
 export type UserDto = z.infer<typeof userDtoSchema>;
 
+export const managedUserDtoSchema = userDtoSchema.extend({
+  unitId: z.uuid().nullable().describe("Student: their class unit. Staff: home unit (a HOD's managed subtree)"),
+  designation: z.string().nullable(),
+});
+
 /** Strips private columns (password hash) from a users row. */
 export function toUserDto(row: typeof users.$inferSelect): UserDto {
   return {
