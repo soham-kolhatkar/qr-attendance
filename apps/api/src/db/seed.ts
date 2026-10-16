@@ -69,6 +69,8 @@ async function seedDemo(db: Db, ownerId: string) {
   }
   const instituteId = demo!.id;
   const adminId = (await findUserId(db, instituteId, 'admin'))!;
+  // Demo accounts use a known password, so don't force the admin to change it.
+  await db.update(users).set({ mustChangePassword: false }).where(eq(users.id, adminId));
   const auth: InstituteAuthContext = { userId: adminId, role: 'admin', instituteId };
 
   if ((await listLevels(db, instituteId)).length > 0) {

@@ -53,6 +53,11 @@ describe('QR payload', () => {
     expect(isQrMacValid(parseQrPayload(swapped.join('.'))!, secret)).toBe(false);
   });
 
+  it('matches the fixed example shared with the web projector (apps/web/src/lib/qr.ts)', () => {
+    const payload = qrPayload('0f8fad5b-d9cb-469f-a165-70867728950e', 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8', 358432150);
+    expect(payload).toBe('QA1.B6H22W6ZZNDJ7ILFOCDHOKEVBY.358432150.LMNTYN7VZXCMUF5I');
+  });
+
   it('rejects malformed payloads', () => {
     for (const bad of ['', 'hello', 'QA1.X.1.Y', 'QA2.AAAA.1.AAAA', `QA1.${'A'.repeat(26)}.-5.${'A'.repeat(16)}`]) {
       expect(parseQrPayload(bad)).toBeNull();

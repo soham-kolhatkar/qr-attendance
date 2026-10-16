@@ -4,3 +4,5 @@ dist/
 *.log
 coverage/
 .DS_Store
+apps/web/e2e/.results/
+apps/web/e2e/screenshots/

@@ -15,11 +15,42 @@ import {
 } from '../../lib/validation.js';
 import { getInstituteAuth, guard } from '../../plugins/auth.js';
 import { managedUserDtoSchema } from './dto.js';
-import { createUser, getUser, listUsers, resetPassword, updateUser } from './service.js';
+import { createUser, getUser, listStaffDirectory, listUsers, resetPassword, updateUser } from './service.js';
 
 const staffRoleSchema = z.enum(['admin', 'hod', 'faculty']);
 const security = [{ bearerAuth: [] }];
 const tags = ['users'];
+
+/**
+ * Names of active teaching staff, for "who teaches this" pickers. Readable by all
+ * staff (HODs assign teachers to offerings); carries no contact details.
+ */
+export const directoryRoutes: FastifyPluginAsyncZod = async (app) => {
+  app.get(
+    '/staff',
+    {
+      preHandler: guard('admin', 'hod', 'faculty'),
+      schema: {
+        tags,
+        security,
+        summary: 'Active faculty, HODs and admins (names only)',
+        response: {
+          200: z.array(
+            z.object({
+              id: z.uuid(),
+              username: z.string(),
+              fullName: z.string(),
+              role: staffRoleSchema,
+              unitId: z.uuid().nullable(),
+              designation: z.string().nullable(),
+            }),
+          ),
+        },
+      },
+    },
+    (req) => listStaffDirectory(app.db, getInstituteAuth(req).instituteId),
+  );
+};
 
 /**
  * Institute-admin endpoints for every account in the institute. Staff are created here;

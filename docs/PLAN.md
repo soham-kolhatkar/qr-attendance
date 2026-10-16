@@ -177,7 +177,7 @@ example a lab for batch A2 only. All of this can be bulk-imported from Excel/CSV
 |---|---|---|
 | API | Node 24, TypeScript, Fastify, Zod, Drizzle ORM | Docker image → Google Cloud Run free tier / Oracle Always-Free VM (decided at deploy time) |
 | Database | PostgreSQL 17 | Neon or Supabase free tier |
-| Web | React + Vite, Tailwind + shadcn/ui, TanStack Query, Recharts | Cloudflare Pages / Vercel |
+| Web | React + Vite, Mantine UI, TanStack Query, React Router, typed API client generated from OpenAPI | Cloudflare Pages / Vercel |
 | Mobile | Expo (React Native) dev builds, `expo-camera`, `@expo/app-integrity` | EAS Build free tier |
 | Email / push | Brevo or Resend free tier / Expo push | free |
 | API docs | OpenAPI generated from the Zod schemas, at `/docs` | — |
@@ -197,8 +197,8 @@ Everything else stays on free tiers until a client signs.
 |---|---|---|
 | 1 ✅ | Foundation | Monorepo, API server, Postgres in Docker, migrations, institutes (tenants), users & roles, login/refresh/logout, audit log, OpenAPI docs, automated tests |
 | 2 ✅ | Academic structure | Structure levels, unit tree, groups/batches, terms, subjects, course offerings, student profiles, HOD scope, Excel/CSV bulk import |
-| **3** 🔍 | **Attendance engine** | Sessions, rotating-QR engine, scan verification, manual marking with reasons, auto-close and absentees, live headcount (SSE) |
-| 4 | Web app I | Login, admin screens for structure, users and imports, faculty "start session" and projector QR page with live count |
+| 3 ✅ | Attendance engine | Sessions, rotating-QR engine, scan verification, manual marking with reasons, auto-close and absentees, live headcount (SSE) |
+| 4 ✅ | Web app I | Login, admin screens for structure, users and imports, faculty "start session" and projector QR page with live count |
 | 5 | Mobile app + device binding | Expo app: login, device registration with hardware attestation, QR scanner, my attendance; device change requests and approvals |
 | 6 | Reports & dashboards | Student, faculty, HOD and admin dashboards; defaulter list (< threshold); trends and heatmaps; Excel/PDF export |
 | 7 | Corrections & notifications | Attendance correction requests and approvals, audit-log viewer, email and push alerts (e.g. low attendance) |

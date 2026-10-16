@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, or, type SQL } from 'drizzle-orm';
 import type { Db, DbOrTx } from '../../db/client.js';
 import { type Role, staffProfiles, students, users } from '../../db/schema.js';
 import { writeAudit } from '../../lib/audit.js';
@@ -156,6 +156,25 @@ export async function listUsers(db: Db, instituteId: string, query: ListUsersQue
   ]);
 
   return { items: rows.map(toManagedDto), total: totalRow?.total ?? 0, page: query.page, pageSize: query.pageSize };
+}
+
+export async function listStaffDirectory(db: Db, instituteId: string) {
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      fullName: users.fullName,
+      role: users.role,
+      unitId: staffProfiles.unitId,
+      designation: staffProfiles.designation,
+    })
+    .from(users)
+    .leftJoin(staffProfiles, eq(staffProfiles.userId, users.id))
+    .where(
+      and(eq(users.instituteId, instituteId), eq(users.status, 'active'), inArray(users.role, ['admin', 'hod', 'faculty'])),
+    )
+    .orderBy(asc(users.fullName));
+  return rows.map((r) => ({ ...r, role: r.role as 'admin' | 'hod' | 'faculty' }));
 }
 
 /** Tenant-scoped lookup: a user in another institute is reported as not found. */
