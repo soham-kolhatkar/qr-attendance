@@ -91,7 +91,7 @@ export async function listAudienceStudents(db: DbOrTx, instituteId: string, audi
 // ---------------------------------------------------------------------------
 
 /** HODs may only target units/groups inside their department. Returns the loaded rows. */
-async function validateAudience(db: DbOrTx, instituteId: string, scope: Scope, audience: Audience) {
+export async function validateAudience(db: DbOrTx, instituteId: string, scope: Scope, audience: Audience) {
   const unitIds = [...new Set(audience.unitIds)];
   const groupIds = [...new Set(audience.groupIds)];
   if (unitIds.length + groupIds.length === 0) throw badRequest('EMPTY_AUDIENCE', 'Choose at least one class or group');
@@ -143,7 +143,7 @@ async function validateFaculty(db: DbOrTx, instituteId: string, facultyIds: read
 }
 
 /** SQL limiting offerings to those the caller may see; undefined = all. */
-function visibilityCondition(auth: InstituteAuthContext, scope: Scope): SQL | undefined {
+export function visibilityCondition(auth: InstituteAuthContext, scope: Scope): SQL | undefined {
   if (scope.all) return undefined;
   const teaches = sql`exists (select 1 from ${offeringFaculty} where ${offeringFaculty.offeringId} = ${offerings.id} and ${offeringFaculty.userId} = ${auth.userId})`;
   if (scope.unitId === null) return teaches;
@@ -156,7 +156,7 @@ function visibilityCondition(auth: InstituteAuthContext, scope: Scope): SQL | un
   return or(teaches, inDepartment);
 }
 
-async function findVisibleOffering(db: DbOrTx, auth: InstituteAuthContext, scope: Scope, offeringId: string) {
+export async function findVisibleOffering(db: DbOrTx, auth: InstituteAuthContext, scope: Scope, offeringId: string) {
   const [row] = await db
     .select()
     .from(offerings)
@@ -168,7 +168,7 @@ async function findVisibleOffering(db: DbOrTx, auth: InstituteAuthContext, scope
   return row;
 }
 
-function loadAudience(db: DbOrTx, offeringId: string): Promise<Audience> {
+export function loadAudience(db: DbOrTx, offeringId: string): Promise<Audience> {
   return db
     .select()
     .from(offeringAudience)

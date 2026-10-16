@@ -15,6 +15,13 @@
       "when": 1792157905008,
       "tag": "0001_academic_structure",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792160029945,
+      "tag": "0002_attendance",
+      "breakpoints": true
     }
   ]
 }

@@ -6,8 +6,8 @@ export type Db = NodePgDatabase<typeof schema>;
 /** A database handle that may be the root connection or an open transaction. */
 export type DbOrTx = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
 
-export function createDb(databaseUrl: string): { db: Db; pool: pg.Pool } {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
+export function createDb(databaseUrl: string, poolMax = 10): { db: Db; pool: pg.Pool } {
+  const pool = new pg.Pool({ connectionString: databaseUrl, max: poolMax });
   const db = drizzle(pool, { schema });
   return { db, pool };
 }

@@ -7,7 +7,7 @@ the security design and the feature roadmap.
 ## Repository layout
 
 ```
-apps/api      Backend API (Node 24, Fastify, PostgreSQL)   ← Features 1–2
+apps/api      Backend API (Node 24, Fastify, PostgreSQL)   ← Features 1–3
 apps/web      Faculty projector page + dashboards          (Feature 4)
 apps/mobile   Student app, Expo React Native               (Feature 5)
 docs/         Plan and design notes
@@ -39,6 +39,15 @@ npm run dev                      # API on http://localhost:3000
 
 The demo structure is `Department › Year › Division`, with Computer Engineering › SY ›
 Div A and Div B. Each institute defines its own levels, so this is just an example.
+
+**Try an attendance session** (in http://localhost:3000/docs):
+1. Log in as `prof.sharma`. Find the CS301 offering with `GET /v1/offerings?mine=true`,
+   then start a session with `POST /v1/sessions`, giving it that `offeringId`.
+2. `GET /v1/sessions/{id}/qr` gives the code the projector would show right now.
+3. Log in as `2024comp001` and send that code to `POST /v1/attendance/scan` within about
+   15 seconds.
+4. As `prof.sharma`, `GET /v1/sessions/{id}/records` shows who is present.
+   `POST /v1/sessions/{id}/mark` marks a student by hand; a reason is required.
 
 ## Tests
 
