@@ -1,0 +1,17 @@
+{
+  "name": "qr-attendance",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "api:dev": "npm run dev -w apps/api",
+    "api:test": "npm test -w apps/api",
+    "api:typecheck": "npm run typecheck -w apps/api"
+  }
+}
