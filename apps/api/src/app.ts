@@ -16,6 +16,8 @@ import { z } from 'zod';
 import type { Config } from './config.js';
 import type { Db } from './db/client.js';
 import { AppError } from './lib/errors.js';
+import { LiveHub } from './modules/attendance/live.js';
+import { scanRoutes, sessionRoutes, settingsRoutes } from './modules/attendance/routes.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { subjectRoutes, termRoutes } from './modules/catalog/routes.js';
 import { groupRoutes } from './modules/groups/routes.js';
@@ -31,6 +33,10 @@ declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     config: Config;
+    /** Live attendance events (scans, manual marks, session changes). */
+    live: LiveHub;
+    /** Current time. Injectable so tests can move the clock. */
+    now(): Date;
   }
   interface FastifyContextConfig {
     /**
@@ -41,7 +47,7 @@ declare module 'fastify' {
   }
 }
 
-export async function buildApp({ config, db }: { config: Config; db: Db }) {
+export async function buildApp({ config, db, clock = Date.now }: { config: Config; db: Db; clock?: () => number }) {
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
     logger:
@@ -57,6 +63,10 @@ export async function buildApp({ config, db }: { config: Config; db: Db }) {
   app.setSerializerCompiler(serializerCompiler);
   app.decorate('db', db);
   app.decorate('config', config);
+  app.decorate('now', () => new Date(clock()));
+  const live = new LiveHub(config.DATABASE_URL, app.log);
+  app.decorate('live', live);
+  app.addHook('onClose', () => live.stop());
 
   await app.register(cors, { origin: config.CORS_ORIGINS.length > 0 ? config.CORS_ORIGINS : false });
   // Limits are opted into per route. The preHandler hook runs after body parsing so
@@ -103,6 +113,21 @@ export async function buildApp({ config, db }: { config: Config; db: Db }) {
     },
   );
 
+  app.get(
+    '/v1/time',
+    {
+      schema: {
+        tags: ['system'],
+        summary: 'Server clock, so screens and apps can correct their own clocks',
+        response: { 200: z.object({ serverTime: z.iso.datetime(), epochMs: z.number().int() }) },
+      },
+    },
+    () => {
+      const now = app.now();
+      return { serverTime: now.toISOString(), epochMs: now.getTime() };
+    },
+  );
+
   await app.register(authRoutes, { prefix: '/v1/auth' });
   await app.register(meRoutes, { prefix: '/v1' });
   await app.register(platformRoutes, { prefix: '/v1/platform' });
@@ -114,6 +139,9 @@ export async function buildApp({ config, db }: { config: Config; db: Db }) {
   await app.register(subjectRoutes, { prefix: '/v1/subjects' });
   await app.register(offeringRoutes, { prefix: '/v1/offerings' });
   await app.register(importRoutes, { prefix: '/v1/imports' });
+  await app.register(sessionRoutes, { prefix: '/v1/sessions' });
+  await app.register(scanRoutes, { prefix: '/v1/attendance' });
+  await app.register(settingsRoutes, { prefix: '/v1/settings' });
 
   return app;
 }

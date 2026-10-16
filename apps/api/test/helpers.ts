@@ -24,12 +24,22 @@ const config = loadConfig({
  */
 export function useTestApp() {
   const { db, pool } = createDb(TEST_DATABASE_URL);
-  const ctx = { app: undefined as unknown as App, db };
+  const ctx = {
+    app: undefined as unknown as App,
+    db,
+    /** Added to the real clock as the app sees it; reset before each test. */
+    clockOffsetMs: 0,
+    /** Moves the app's clock forward. */
+    advance(ms: number) {
+      ctx.clockOffsetMs += ms;
+    },
+  };
 
   beforeEach(async () => {
     // institutes is referenced (directly or indirectly) by every table, so CASCADE empties them all.
     await db.execute(sql`TRUNCATE institutes, users, audit_logs RESTART IDENTITY CASCADE`);
-    ctx.app = await buildApp({ config, db });
+    ctx.clockOffsetMs = 0;
+    ctx.app = await buildApp({ config, db, clock: () => Date.now() + ctx.clockOffsetMs });
   });
   afterEach(async () => {
     await ctx.app.close();
@@ -167,3 +177,33 @@ export function multipartFile(filename: string, content: Buffer | string, conten
     headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
   };
 }
+
+/**
+ * Ready-to-teach class: COMP SY Div A (batches A1/A2) and Div B, a term, subject
+ * CS301 taught by prof.a to Div A, and students. Returns tokens and ids.
+ */
+export async function setupClass(app: App, db: Db) {
+  const { admin, owner } = await setupInstitute(app, db);
+  const s = await setupStructure(app, admin);
+  const api = as(app, admin);
+  const term = expectStatus(await api.post('/v1/terms', { name: 'Odd', startsOn: '2026-07-01', endsOn: '2026-11-30' }), 201);
+  const subject = expectStatus(await api.post('/v1/subjects', { code: 'CS301', name: 'Data Structures', unitId: s.comp }), 201);
+  const prof = await createUserAs(app, admin, { role: 'faculty', username: 'prof.a', fullName: 'Prof A' });
+  await createUserAs(app, admin, { role: 'faculty', username: 'prof.b', fullName: 'Prof B' });
+  const offering = expectStatus(
+    await api.post('/v1/offerings', { termId: term.id, subjectId: subject.id, facultyIds: [prof.id], audience: { unitIds: [s.compA] } }),
+    201,
+  );
+  const student = async (username: string, unitId: string, rollNo: string, groupIds: string[] = []) =>
+    (await createUserAs(app, admin, { role: 'student', username, fullName: `Student ${username}`, unitId, rollNo, groupIds })).id;
+  const students = {
+    a1: await student('ca01', s.compA, '1', [s.a1]),
+    a2: await student('ca02', s.compA, '2', [s.a1]),
+    a3: await student('ca03', s.compA, '3', [s.a2]),
+    b1: await student('cb01', s.compB, '1'),
+  };
+  const profTokens = await login(app, { instituteCode: 'ALPHA', username: 'prof.a' });
+  return { admin, owner, s, term, subject, offering, prof, profTokens, students };
+}
+
+export const loginStudent = (app: App, username: string) => login(app, { instituteCode: 'ALPHA', username });

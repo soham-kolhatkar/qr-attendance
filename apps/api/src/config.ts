@@ -3,6 +3,8 @@ import { z } from 'zod';
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.url(),
+  /** Max Postgres connections per API instance. Raise for heavy scan bursts if the database allows it. */
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default('0.0.0.0'),

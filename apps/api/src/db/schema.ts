@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  bigint,
   bigserial,
   boolean,
   check,
@@ -44,6 +45,14 @@ export const userStatusEnum = pgEnum('user_status', ['active', 'disabled']);
 /** Per-institute tunables. Every field is optional; defaults live in code. */
 export type InstituteSettings = {
   timezone?: string;
+  attendance?: {
+    /** How often the QR code changes. */
+    qrRotationSeconds?: number;
+    /** How long a code is still accepted after the screen moved on to the next one (covers slow networks). */
+    qrGraceSeconds?: number;
+    /** How long QR scanning stays open after a session starts. */
+    defaultScanMinutes?: number;
+  };
 };
 
 /** A tenant. Every institute-owned row carries institute_id. */
@@ -350,5 +359,95 @@ export const offeringAudience = pgTable(
     check('offering_audience_one_target', sql`(${t.unitId} IS NULL) <> (${t.groupId} IS NULL)`),
     unique('offering_audience_unit_uq').on(t.offeringId, t.unitId),
     unique('offering_audience_group_uq').on(t.offeringId, t.groupId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Attendance (Feature 3)
+// ---------------------------------------------------------------------------
+
+export const SESSION_KINDS = ['lecture', 'lab', 'tutorial', 'other'] as const;
+export const sessionStatusEnum = pgEnum('session_status', ['open', 'closed', 'cancelled']);
+export const ATTENDANCE_STATUSES = ['present', 'absent', 'excused'] as const;
+export const attendanceStatusEnum = pgEnum('attendance_status', ATTENDANCE_STATUSES);
+export const markMethodEnum = pgEnum('mark_method', ['qr', 'manual']);
+
+/**
+ * One lecture / lab occurrence of an offering. While "open", the faculty screen shows
+ * a rotating QR code that students scan; it closes by itself at closes_at.
+ */
+export const attendanceSessions = pgTable(
+  'attendance_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    offeringId: uuid('offering_id')
+      .notNull()
+      .references(() => offerings.id, { onDelete: 'restrict' }),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: SESSION_KINDS }).notNull().default('lecture'),
+    topic: text('topic'),
+    /** Optional narrowing of the offering audience, e.g. one lab batch: { unitIds, groupIds }. */
+    audience: jsonb('audience').$type<{ unitIds: string[]; groupIds: string[] }>(),
+    status: sessionStatusEnum('status').notNull().default('open'),
+    startedAt: timestamptz('started_at').notNull().defaultNow(),
+    /** When QR scanning stops automatically. */
+    closesAt: timestamptz('closes_at').notNull(),
+    closedAt: timestamptz('closed_at'),
+    cancelReason: text('cancel_reason'),
+    /** HMAC key for this session's rotating QR codes (base64url, 32 bytes). Never sent to students. */
+    qrSecret: text('qr_secret').notNull(),
+    /** Snapshot of the institute settings when the session started. */
+    qrRotationSeconds: integer('qr_rotation_seconds').notNull(),
+    qrGraceSeconds: integer('qr_grace_seconds').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index('attendance_sessions_institute_started_idx').on(t.instituteId, t.startedAt.desc()),
+    index('attendance_sessions_offering_started_idx').on(t.offeringId, t.startedAt.desc()),
+    index('attendance_sessions_open_closes_idx').on(t.closesAt).where(sql`${t.status} = 'open'`),
+    // A teacher runs one live session at a time (also stops double-clicked "Start").
+    uniqueIndex('attendance_sessions_one_open_per_creator').on(t.createdBy).where(sql`${t.status} = 'open'`),
+  ],
+);
+
+/**
+ * One row per expected student per session, created when the session starts (a
+ * snapshot of the roster), so later class changes never rewrite history.
+ */
+export const attendanceRecords = pgTable(
+  'attendance_records',
+  {
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => attendanceSessions.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.userId, { onDelete: 'restrict' }),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    status: attendanceStatusEnum('status').notNull().default('absent'),
+    method: markMethodEnum('method'),
+    markedAt: timestamptz('marked_at'),
+    /** The student (QR scan) or the teacher/admin (manual). */
+    markedBy: uuid('marked_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Required for manual changes. */
+    reason: text('reason'),
+    /** Which QR step was scanned, for audits. */
+    qrStep: bigint('qr_step', { mode: 'number' }),
+    ip: text('ip'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.studentId] }),
+    index('attendance_records_student_idx').on(t.studentId),
+    index('attendance_records_institute_student_idx').on(t.instituteId, t.studentId),
   ],
 );

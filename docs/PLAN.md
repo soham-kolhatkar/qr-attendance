@@ -66,31 +66,44 @@ secure hardware**, which cannot be copied off the phone.
 ### 3.2 Rotating QR code
 
 - Each session gets a random 256-bit secret `K`.
-- `step = floor(serverTime / 5s)`
-- `code = HMAC-SHA256(K, sessionId:step)`, truncated to 96 bits
-- The QR text is `QA1:<session>:<step>:<code>`, about 45 characters. That fits a small QR
-  version, which stays readable from the back of a classroom when projected.
-- The faculty page syncs its clock with the server and redraws the QR every 5 seconds,
-  with a countdown bar. It works out each code locally, so a network blip in class doesn't
-  stop the QR from changing.
-- The server accepts the current step and the previous ones within a short window (about
-  10–15 seconds, set per institute). A screenshot sent on WhatsApp has expired by the time
-  someone opens it.
+- `step = floor(serverTime / rotation)`, with a rotation of 5 s by default.
+- The QR text is `QA1.<session id>.<step>.<code>`:
+  - `code` is HMAC-SHA256(K, `QA1.<session id>.<step>`), truncated to 80 bits.
+  - The session id and code are written in base32 (upper-case letters and digits).
+  - That's about 54 characters, which fits a version-3 QR code in alphanumeric mode (29×29
+    squares). Big squares stay readable from the back of a classroom.
+- The faculty page gets `K` once, corrects its clock against the server, and works out
+  each code itself. A network blip in class doesn't stop the QR from changing.
+- A code is accepted while it is on screen, plus a grace period after it is replaced (10 s
+  by default) to cover slow mobile data. A forwarded screenshot stops working within
+  about 15 s.
+- Each institute can tune three settings: the rotation interval, the grace period, and
+  how long scanning stays open (10 minutes by default). A session uses the values in force
+  when it starts.
 
 ### 3.3 Scan verification (server)
 
 For each scan the server checks, in order:
 
 1. The student is logged in.
-2. The device is active and belongs to this student.
-3. The device signature is valid.
-4. The QR code's HMAC is valid and its step is fresh.
-5. The session is open.
-6. The student is in the session's audience (division, batch, elective…).
-7. Then it records attendance. Recording is idempotent, because there is one row per
-   student per session.
+2. The QR code is well-formed, belongs to a session of the student's institute, and its
+   signature is valid. Nothing about the session is revealed before this check passes.
+3. The session is open, not closed or cancelled.
+4. The code is fresh.
+5. The device is active, belongs to this student, and its signature is valid (Feature 5).
+6. The student is on the session's list. That list is taken when the session starts, so
+   later class changes never rewrite history.
+7. Then it marks the student present.
+   - Scanning again is harmless.
+   - A status the teacher set by hand is never overridden by a scan.
 
 The scan screen shows a green tick with the subject name.
+
+**Measured on a laptop**, with 30 classes and 2,010 students:
+- Scans spread over 20 seconds: the median is 11 ms, the 95th percentile is 23 ms, and
+  nothing failed.
+- All 2,010 scans fired at the same instant: about 330 scans/s, all done in 5 s, and
+  nothing failed.
 
 ### 3.4 Known limitation (by design, for now)
 
@@ -183,8 +196,8 @@ Everything else stays on free tiers until a client signs.
 | # | Feature | Contents |
 |---|---|---|
 | 1 ✅ | Foundation | Monorepo, API server, Postgres in Docker, migrations, institutes (tenants), users & roles, login/refresh/logout, audit log, OpenAPI docs, automated tests |
-| **2** 🔍 | **Academic structure** | Structure levels, unit tree, groups/batches, terms, subjects, course offerings, student profiles, HOD scope, Excel/CSV bulk import |
-| 3 | Attendance engine | Sessions, rotating-QR engine, scan verification, manual marking with reasons, auto-close and absentees, live headcount (SSE) |
+| 2 ✅ | Academic structure | Structure levels, unit tree, groups/batches, terms, subjects, course offerings, student profiles, HOD scope, Excel/CSV bulk import |
+| **3** 🔍 | **Attendance engine** | Sessions, rotating-QR engine, scan verification, manual marking with reasons, auto-close and absentees, live headcount (SSE) |
 | 4 | Web app I | Login, admin screens for structure, users and imports, faculty "start session" and projector QR page with live count |
 | 5 | Mobile app + device binding | Expo app: login, device registration with hardware attestation, QR scanner, my attendance; device change requests and approvals |
 | 6 | Reports & dashboards | Student, faculty, HOD and admin dashboards; defaulter list (< threshold); trends and heatmaps; Excel/PDF export |
