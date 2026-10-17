@@ -6,6 +6,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -56,6 +57,12 @@ export type InstituteSettings = {
     requireRegisteredPhone?: boolean;
     /** Students below this attendance percentage are listed as defaulters. */
     minimumPercent?: number;
+    /** How many days after a class students can ask for their mark to be corrected; 0 turns requests off. */
+    correctionWindowDays?: number;
+    /** Remind students below the minimum, at most once a week. */
+    lowAttendanceAlerts?: boolean;
+    /** Monday email to teachers, HODs and admins listing students below the minimum. */
+    weeklyStaffSummary?: boolean;
   };
 };
 
@@ -135,7 +142,11 @@ export const auditLogs = pgTable(
     ip: text('ip'),
     createdAt: createdAt(),
   },
-  (t) => [index('audit_logs_institute_created_idx').on(t.instituteId, t.createdAt.desc())],
+  (t) => [
+    index('audit_logs_institute_created_idx').on(t.instituteId, t.createdAt.desc()),
+    index('audit_logs_actor_created_idx').on(t.actorUserId, t.createdAt.desc()),
+    index('audit_logs_entity_idx').on(t.entityType, t.entityId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -588,4 +599,137 @@ export const sessionTallies = pgTable(
     ...tallyCounts(),
   },
   (t) => [primaryKey({ columns: [t.sessionId, t.unitId] }), index('session_tallies_offering_idx').on(t.offeringId)],
+);
+
+// ---------------------------------------------------------------------------
+// Corrections & notifications (Feature 7)
+// ---------------------------------------------------------------------------
+
+/**
+ * pending   – waiting for the session's teacher, the HOD or an admin.
+ * approved  – the mark was changed (by the request, or by hand to what was asked).
+ * rejected  – turned down; the student can't ask again for that class.
+ * withdrawn – the student took it back.
+ */
+export const CORRECTION_STATUSES = ['pending', 'approved', 'rejected', 'withdrawn'] as const;
+export const correctionStatusEnum = pgEnum('correction_status', CORRECTION_STATUSES);
+
+/** A student asking for their mark in one session to be changed ("I was there but my scan failed"). */
+export const attendanceCorrections = pgTable(
+  'attendance_corrections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    sessionId: uuid('session_id').notNull(),
+    studentId: uuid('student_id').notNull(),
+    requestedStatus: attendanceStatusEnum('requested_status').notNull(),
+    /** The student's mark when they asked. */
+    previousStatus: attendanceStatusEnum('previous_status').notNull(),
+    reason: text('reason').notNull(),
+    status: correctionStatusEnum('status').notNull().default('pending'),
+    reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: timestamptz('reviewed_at'),
+    reviewNote: text('review_note'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'attendance_corrections_record_fk',
+      columns: [t.sessionId, t.studentId],
+      foreignColumns: [attendanceRecords.sessionId, attendanceRecords.studentId],
+    }).onDelete('cascade'),
+    check('attendance_corrections_not_absent', sql`${t.requestedStatus} <> 'absent'`),
+    uniqueIndex('attendance_corrections_one_pending').on(t.sessionId, t.studentId).where(sql`${t.status} = 'pending'`),
+    index('attendance_corrections_record_idx').on(t.sessionId, t.studentId),
+    index('attendance_corrections_institute_status_idx').on(t.instituteId, t.status, t.createdAt),
+    index('attendance_corrections_student_idx').on(t.studentId, t.createdAt.desc()),
+  ],
+);
+
+/** What a notification is about; clients pick the screen to open from the kind. */
+export type NotificationData = {
+  sessionId?: string;
+  correctionId?: string;
+  termId?: string;
+};
+
+/**
+ * Delivery by email or to the phone app, tracked per channel:
+ * NULL (not sent that way), pending, sent, failed (gave up after retries), or skipped
+ * (no email address, no phone registered, or the channel isn't set up on this server).
+ */
+export const DELIVERY_STATUSES = ['pending', 'sent', 'failed', 'skipped'] as const;
+export const deliveryStatusEnum = pgEnum('delivery_status', DELIVERY_STATUSES);
+
+/** A message to one user: always shown in the app's notification list, optionally emailed and pushed. */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    data: jsonb('data').$type<NotificationData>().notNull().default({}),
+    readAt: timestamptz('read_at'),
+    emailStatus: deliveryStatusEnum('email_status'),
+    pushStatus: deliveryStatusEnum('push_status'),
+    /** When the email went out (for the daily sending limit). */
+    emailedAt: timestamptz('emailed_at'),
+    attempts: integer('attempts').notNull().default(0),
+    /** When delivery is next tried; also a lease, so two servers never send the same message. */
+    nextAttemptAt: timestamptz('next_attempt_at').notNull().defaultNow(),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('notifications_user_created_idx').on(t.userId, t.createdAt.desc()),
+    index('notifications_unread_idx').on(t.userId).where(sql`${t.readAt} IS NULL`),
+    index('notifications_outbox_idx')
+      .on(t.nextAttemptAt)
+      .where(sql`${t.emailStatus} = 'pending' OR ${t.pushStatus} = 'pending'`),
+    index('notifications_emailed_idx').on(t.emailedAt).where(sql`${t.emailedAt} IS NOT NULL`),
+  ],
+);
+
+/** Where to push notifications: the app's registration with the phone's push service. */
+export const pushTokens = pgTable(
+  'push_tokens',
+  {
+    token: text('token').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    platform: devicePlatformEnum('platform').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('push_tokens_user_idx').on(t.userId)],
+);
+
+/** Scheduled jobs that have run, so each runs once per period even with several servers. */
+export const jobRuns = pgTable(
+  'job_runs',
+  {
+    job: text('job').notNull(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'cascade' }),
+    /** e.g. "2026-10-19" for a daily job, "2026-W43" for a weekly one (in the institute's time zone). */
+    period: text('period').notNull(),
+    result: jsonb('result').$type<Record<string, unknown>>(),
+    ranAt: timestamptz('ran_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.job, t.instituteId, t.period] })],
 );

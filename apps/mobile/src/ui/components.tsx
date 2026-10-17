@@ -141,6 +141,7 @@ export function Field({
         {...props}
         style={[
           styles.input,
+          props.multiline && styles.multiline,
           { backgroundColor: colors.surface, borderColor: error ? colors.danger : colors.border, color: colors.text },
         ]}
       />
@@ -232,6 +233,7 @@ const styles = StyleSheet.create({
   buttonLarge: { minHeight: 64, borderRadius: radius.lg },
   buttonText: { fontSize: 16, fontWeight: '600' },
   input: { minHeight: 48, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
+  multiline: { minHeight: 110, paddingTop: space.md, paddingBottom: space.md, textAlignVertical: 'top' },
   card: { borderWidth: 1, borderRadius: radius.lg, padding: space.lg, gap: space.md },
   banner: { flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.md, alignItems: 'flex-start' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.lg },

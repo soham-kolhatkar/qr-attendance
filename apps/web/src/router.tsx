@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import type { Role } from './api/types';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/AppLayout';
+import { ActivityPage } from './pages/admin/ActivityPage';
 import { CatalogPage } from './pages/admin/CatalogPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { ImportPage } from './pages/admin/ImportPage';
@@ -12,6 +13,7 @@ import { StaffPage } from './pages/admin/StaffPage';
 import { StructurePage } from './pages/admin/StructurePage';
 import { StudentsPage } from './pages/admin/StudentsPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { CorrectionsPage } from './pages/corrections/CorrectionsPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -65,6 +67,8 @@ export const router = createBrowserRouter([
       { path: 'catalog', element: <RequireAuth roles={MANAGERS}><CatalogPage /></RequireAuth> },
       { path: 'offerings', element: <RequireAuth roles={MANAGERS}><OfferingsPage /></RequireAuth> },
       { path: 'settings', element: <RequireAuth roles={ADMIN}><SettingsPage /></RequireAuth> },
+      { path: 'activity', element: <RequireAuth roles={['admin', 'platform_admin']}><ActivityPage /></RequireAuth> },
+      { path: 'corrections', element: <RequireAuth roles={STAFF}><CorrectionsPage /></RequireAuth> },
       { path: 'classes', element: <RequireAuth roles={STAFF}><MyClassesPage /></RequireAuth> },
       { path: 'sessions', element: <RequireAuth roles={STAFF}><SessionsPage /></RequireAuth> },
       { path: 'sessions/:id', element: <RequireAuth roles={STAFF}><SessionPage /></RequireAuth> },

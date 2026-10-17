@@ -4,6 +4,16 @@ import { z } from 'zod';
 /** apps/web/dist, resolved from both src/ (tsx) and dist/ (compiled) builds of the API. */
 const DEFAULT_WEB_DIST = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
+/** Unset and empty both mean "not configured" (hosting dashboards often keep empty variables). */
+const optional = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => v || undefined);
+
+const serviceAccountSchema = z.object({ project_id: z.string(), client_email: z.string(), private_key: z.string() });
+export type FirebaseServiceAccount = { projectId: string; clientEmail: string; privateKey: string };
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.url(),
@@ -52,12 +62,52 @@ const envSchema = z.object({
     .pipe(z.array(z.string().regex(/^[0-9a-f]{64}$/, 'Each fingerprint must be 64 hex characters'))),
   /** Check Google's list of revoked attestation keys when a phone is linked. */
   ATTESTATION_REVOCATION_CHECK: z.stringbool().default(true),
+  /** The web app's address, for links in emails. On Render it defaults to the service's own address. */
+  PUBLIC_URL: optional.pipe(z.url().optional()),
+  /** How emails are sent: not at all, written to the server log (development), or through Brevo. */
+  EMAIL_PROVIDER: z.enum(['none', 'log', 'brevo']).default('none'),
+  BREVO_API_KEY: optional,
+  /** Sender, e.g. "QR Attendance <alerts@example.com>". With Brevo it must be a sender verified in the Brevo account. */
+  EMAIL_FROM: optional.pipe(
+    z
+      .string()
+      .regex(/^(?:[^<>]+<[^<>\s]+@[^<>\s]+>|[^<>\s]+@[^<>\s]+)$/, 'Use "Name <address@example.com>" or just the address')
+      .optional(),
+  ),
+  /** Emails sent per day at most, to stay within the email service's plan (Brevo's free plan: 300). */
+  EMAIL_DAILY_LIMIT: z.coerce.number().int().min(0).default(300),
+  /**
+   * Firebase service account for push notifications to the Android app: the JSON key file's
+   * contents, or the same base64-encoded. Unset turns push notifications off.
+   */
+  FCM_SERVICE_ACCOUNT: optional.transform((v, ctx): FirebaseServiceAccount | undefined => {
+    if (!v) return undefined;
+    try {
+      const json = v.startsWith('{') ? v : Buffer.from(v, 'base64').toString('utf8');
+      const parsed = serviceAccountSchema.safeParse(JSON.parse(json));
+      if (parsed.success) {
+        const { project_id, client_email, private_key } = parsed.data;
+        return { projectId: project_id, clientEmail: client_email, privateKey: private_key };
+      }
+    } catch {
+      // reported below
+    }
+    ctx.addIssue({ code: 'custom', message: "Must be the Firebase service account's JSON key (or that JSON base64-encoded)" });
+    return z.NEVER;
+  }),
+}).superRefine((c, ctx) => {
+  if (c.EMAIL_PROVIDER === 'brevo' && !c.BREVO_API_KEY) {
+    ctx.addIssue({ code: 'custom', path: ['BREVO_API_KEY'], message: 'Required when EMAIL_PROVIDER is brevo' });
+  }
+  if (c.EMAIL_PROVIDER !== 'none' && !c.EMAIL_FROM) {
+    ctx.addIssue({ code: 'custom', path: ['EMAIL_FROM'], message: 'Required when emails are sent' });
+  }
 });
 
 export type Config = z.infer<typeof envSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = envSchema.safeParse(env);
+  const parsed = envSchema.safeParse({ ...env, PUBLIC_URL: env.PUBLIC_URL || env.RENDER_EXTERNAL_URL });
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${issues}`);

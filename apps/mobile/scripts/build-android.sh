@@ -36,7 +36,13 @@ fi
 export QRA_KS_PASS
 QRA_KS_PASS=$(sed -n 's/^storePassword=//p' "$PROPS")
 
-npx expo prebuild --platform android --no-install
+# Push notifications need the Firebase project's config (see app.config.js).
+GOOGLE_SERVICES="${GOOGLE_SERVICES_JSON:-$KEY_DIR/google-services.json}"
+if [ -f "$GOOGLE_SERVICES" ]; then push="on ($GOOGLE_SERVICES)"; else push="off (no $GOOGLE_SERVICES; notifications show inside the app only)"; fi
+
+# --clean: native files are regenerated from app.json each time, so nothing from an
+# earlier build (e.g. a testing build's settings) can linger.
+npx expo prebuild --platform android --no-install --clean
 (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain --quiet)
 
 version=$(node -p "require('./app.json').expo.version")
@@ -50,3 +56,4 @@ digest=$("$BUILD_TOOLS/apksigner" verify --print-certs "$out" | sed -n 's/.*cert
 echo
 echo "Built $out ($(du -h "$out" | cut -f1))"
 echo "Signing certificate SHA-256 (the server's ANDROID_SIGNING_CERT_SHA256): $digest"
+echo "Push notifications: $push"

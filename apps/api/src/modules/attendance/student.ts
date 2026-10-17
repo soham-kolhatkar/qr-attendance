@@ -2,6 +2,7 @@ import { and, desc, eq, ne } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import { attendanceRecords, attendanceSessions, offerings, subjects, terms } from '../../db/schema.js';
 import type { InstituteAuthContext } from '../../plugins/auth.js';
+import { canRequestCorrection, latestCorrections, type MyCorrection, requestableFrom } from '../corrections/service.js';
 import { effectiveStatus } from './sessions.js';
 import { getAttendanceSettings } from './settings.js';
 
@@ -11,6 +12,8 @@ export type MyAttendance = {
   term: { id: string; name: string } | null;
   /** The institute's minimum attendance percentage. */
   minimumPercent: number;
+  /** Days after a class within which the student can ask for a correction; 0 = not in the app. */
+  correctionWindowDays: number;
   /** Terms the student has attendance in, newest first. */
   terms: { id: string; name: string }[];
   overall: Tally;
@@ -25,6 +28,10 @@ export type MyAttendance = {
     status: 'present' | 'absent' | 'excused';
     method: 'qr' | 'manual' | null;
     open: boolean;
+    /** The latest correction request for this class, if any. */
+    correction: MyCorrection | null;
+    /** What the student may ask to be marked instead, now; empty when they can't ask. */
+    canRequest: ('present' | 'excused')[];
   }[];
 };
 
@@ -93,8 +100,8 @@ export async function getMyAttendance(
     .where(mine);
   const termList = termRows.sort((a, b) => b.startsOn.localeCompare(a.startsOn)).map(({ id, name }) => ({ id, name }));
   const term = termList.find((t) => t.id === termId) ?? (termId ? undefined : termList[0]);
-  const { minimumPercent } = await getAttendanceSettings(db, auth.instituteId);
-  const empty = { term: term ?? null, minimumPercent, terms: termList, overall: tally([]), subjects: [], recent: [] };
+  const { minimumPercent, correctionWindowDays } = await getAttendanceSettings(db, auth.instituteId);
+  const empty = { term: term ?? null, minimumPercent, correctionWindowDays, terms: termList, overall: tally([]), subjects: [], recent: [] };
   if (!term) return empty;
 
   const rows = await base()
@@ -106,24 +113,36 @@ export async function getMyAttendance(
   const byOffering = new Map<string, typeof counted>();
   for (const r of counted) byOffering.set(r.offeringId, [...(byOffering.get(r.offeringId) ?? []), r]);
   const collator = new Intl.Collator(undefined, { numeric: true });
+  const recent = withOpen.slice(0, RECENT_LIMIT);
+  const corrections = await latestCorrections(
+    db,
+    auth.userId,
+    recent.map((r) => r.sessionId),
+  );
 
   return {
     term,
     minimumPercent,
+    correctionWindowDays,
     terms: termList,
     overall: tally(counted),
     subjects: [...byOffering.entries()]
       .map(([offeringId, list]) => ({ offeringId, subject: { code: list[0]!.code, name: list[0]!.name }, ...tally(list) }))
       .sort((a, b) => collator.compare(a.subject.code, b.subject.code)),
-    recent: withOpen.slice(0, RECENT_LIMIT).map((r) => ({
-      sessionId: r.sessionId,
-      startedAt: r.startedAt.toISOString(),
-      kind: r.kind,
-      topic: r.topic,
-      subject: { code: r.code, name: r.name },
-      status: r.status,
-      method: r.method,
-      open: r.open,
-    })),
+    recent: recent.map((r) => {
+      const correction = corrections.get(r.sessionId) ?? null;
+      return {
+        sessionId: r.sessionId,
+        startedAt: r.startedAt.toISOString(),
+        kind: r.kind,
+        topic: r.topic,
+        subject: { code: r.code, name: r.name },
+        status: r.status,
+        method: r.method,
+        open: r.open,
+        correction,
+        canRequest: canRequestCorrection(r, correction ?? undefined, correctionWindowDays, now) ? requestableFrom(r.status) : [],
+      };
+    }),
   };
 }

@@ -6,6 +6,7 @@ import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { errorMessage } from '@/api/client';
 import { AuthProvider, useAuth } from '@/auth/AuthContext';
+import { usePushNotifications } from '@/notifications/push';
 import { usePhoneState } from '@/phone/phone';
 import { Banner, Button, Centered, Loading, Text } from '@/ui/components';
 import { space, useColors } from '@/ui/theme';
@@ -33,7 +34,6 @@ export default function RootLayout() {
  */
 function Gate() {
   const { state, retry } = useAuth();
-  const colors = useColors();
   const me = state.status === 'signedIn' ? state.me : null;
   const mustChangePassword = !!me?.user.mustChangePassword;
   const phone = usePhoneState(me && !mustChangePassword ? me.user.id : null);
@@ -66,6 +66,12 @@ function Gate() {
 
   const signedIn = me !== null;
   const ready = signedIn && !mustChangePassword && phone.data?.kind === 'linked';
+  return <Screens signedIn={signedIn} mustChangePassword={mustChangePassword} ready={ready} />;
+}
+
+function Screens({ signedIn, mustChangePassword, ready }: { signedIn: boolean; mustChangePassword: boolean; ready: boolean }) {
+  const colors = useColors();
+  usePushNotifications(ready);
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Protected guard={!signedIn}>
@@ -81,6 +87,8 @@ function Gate() {
         <Stack.Screen name="index" />
         <Stack.Screen name="scan" options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="account" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="correction" options={{ animation: 'slide_from_bottom' }} />
       </Stack.Protected>
     </Stack>
   );

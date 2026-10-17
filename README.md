@@ -86,6 +86,9 @@ npm run build:android            # signed APK in apps/mobile/dist (≈7 minutes 
   `EXPO_PUBLIC_ALLOW_SERVER_CHANGE=true` builds a testing version whose sign-in screen can
   switch servers.
 - Linking needs a real phone: emulators have no secure hardware, so the server refuses them.
+- Push notifications need the Firebase project's `google-services.json` in
+  `~/.qr-attendance` (or `GOOGLE_SERVICES_JSON=<path>`) when building; without it the app
+  works but only shows notifications inside the app. See docs/DEPLOY.md.
 
 ## Tests
 

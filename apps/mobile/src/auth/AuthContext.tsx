@@ -3,6 +3,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { ApiError, api, unwrap } from '../api/client';
 import { server } from '../api/server';
 import type { Me } from '../api/types';
+import { unregisterPush } from '../notifications/push';
 import { session, type TokenPair } from './session';
 
 type AuthState =
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 /** Ends the login on the server (best effort) and forgets it here. */
 async function logout(): Promise<void> {
+  await unregisterPush().catch(() => undefined);
   const refreshToken = session.getRefreshToken();
   if (refreshToken) {
     await fetch(`${server.url}/v1/auth/logout`, {

@@ -47,3 +47,10 @@ export type LiveEvent =
       counts: SessionCounts;
     }
   | { type: 'session'; sessionId: string; status: Session['status']; closesAt: string };
+
+export type Correction = Ok<'/v1/corrections/', 'get'>['items'][number];
+export type CorrectionStatus = Correction['status'];
+export type MyAttendance = Ok<'/v1/attendance/mine', 'get'>;
+export type RecentClass = MyAttendance['recent'][number];
+export type NotificationItem = Ok<'/v1/notifications/', 'get'>['items'][number];
+export type AuditEntry = Ok<'/v1/audit/', 'get'>['items'][number];

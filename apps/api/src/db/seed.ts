@@ -8,17 +8,19 @@
  * test deployment). Its passwords are public, so never enable it for a real institute.
  */
 import { randomBytes } from 'node:crypto';
-import { and, count, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { hashPassword } from '../lib/password.js';
 import type { InstituteAuthContext } from '../plugins/auth.js';
 import { createSubject, createTerm, listTerms } from '../modules/catalog/service.js';
 import { createGroup } from '../modules/groups/service.js';
 import { createInstitute } from '../modules/institutes/service.js';
+import { rejectCorrection, requestCorrection } from '../modules/corrections/service.js';
 import { createOffering } from '../modules/offerings/service.js';
 import { addLevel, createUnit, listLevels } from '../modules/structure/service.js';
 import { createUser } from '../modules/users/service.js';
 import { createDb, type Db } from './client.js';
 import {
+  attendanceCorrections,
   attendanceRecords,
   attendanceSessions,
   groupMembers,
@@ -96,6 +98,7 @@ async function seedDemo(db: Db, ownerId: string) {
   if ((await listLevels(db, instituteId)).length > 0) {
     console.log('DEMO structure already exists.');
     await seedDemoHistory(db, instituteId);
+    await seedDemoCorrections(db, instituteId);
     return;
   }
 
@@ -189,6 +192,7 @@ async function seedDemo(db: Db, ownerId: string) {
       `admin, hod.comp, prof.sharma, ${roster.map((s) => s.username).join(', ')}`,
   );
   await seedDemoHistory(db, instituteId);
+  await seedDemoCorrections(db, instituteId);
 }
 
 /** How often each demo student turns up, so the reports have defaulters to show. */
@@ -292,6 +296,53 @@ async function seedDemoHistory(db: Db, instituteId: string) {
   }
   await db.update(offerings).set({ talliesStale: true }).where(inArray(offerings.id, [lecture.offeringId, lab.offeringId]));
   console.log(`Added ${made} past DEMO sessions for the reports.`);
+}
+
+/**
+ * A few correction requests from demo students about recent classes they missed, so the
+ * Corrections page and the app have something to show: two waiting, one turned down.
+ * Added once (when DEMO has none), through the same code the app and web use.
+ */
+async function seedDemoCorrections(db: Db, instituteId: string) {
+  const [existing] = await db.select({ n: count() }).from(attendanceCorrections).where(eq(attendanceCorrections.instituteId, instituteId));
+  if ((existing?.n ?? 0) > 0) return;
+  const teacherId = await findUserId(db, instituteId, 'prof.sharma');
+  if (!teacherId) return;
+  const now = new Date();
+  const requests = [
+    { username: '2024comp003', requestedStatus: 'present' as const, reason: 'I was in class (second row) but the app said the code had expired. Prof. Sharma saw me.' },
+    { username: '2024comp004', requestedStatus: 'excused' as const, reason: 'I had a fever and went to the doctor. I will bring the certificate to the office.' },
+    { username: '2024comp002', requestedStatus: 'present' as const, reason: 'My phone battery died, but I was there for the whole lecture.', reject: 'You left after the first ten minutes.' },
+  ];
+  let made = 0;
+  for (const r of requests) {
+    const studentId = await findUserId(db, instituteId, r.username);
+    if (!studentId) continue;
+    // Their latest missed class from the past few days (requests are only allowed for a week).
+    const [missed] = await db
+      .select({ sessionId: attendanceRecords.sessionId })
+      .from(attendanceRecords)
+      .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
+      .where(
+        and(
+          eq(attendanceRecords.studentId, studentId),
+          eq(attendanceRecords.status, 'absent'),
+          eq(attendanceSessions.status, 'closed'),
+          gte(attendanceSessions.startedAt, new Date(now.getTime() - 6 * 24 * 3600_000)),
+        ),
+      )
+      .orderBy(desc(attendanceSessions.startedAt))
+      .limit(1);
+    if (!missed) continue;
+    const student: InstituteAuthContext = { userId: studentId, role: 'student', instituteId };
+    const request = await requestCorrection(db, student, { sessionId: missed.sessionId, requestedStatus: r.requestedStatus, reason: r.reason }, now);
+    if (r.reject) {
+      const teacher: InstituteAuthContext = { userId: teacherId, role: 'faculty', instituteId };
+      await rejectCorrection(db, teacher, { all: false, unitId: null }, request.id, r.reject, now);
+    }
+    made++;
+  }
+  if (made) console.log(`Added ${made} demo correction requests.`);
 }
 
 const { db, pool } = createDb(url);
