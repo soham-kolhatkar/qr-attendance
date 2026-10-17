@@ -3,9 +3,14 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * End-to-end tests: a real browser against the built web app and a real API on a
  * throw-away database (the API test database, re-seeded with the DEMO institute).
+ *
+ * Set E2E_BASE_URL to test an already-running deployment instead (one address serving
+ * both the web app and the API, freshly seeded with SEED_DEMO=true); nothing is started
+ * or reset then.
  */
 const API_PORT = 3100;
 const WEB_PORT = 4173;
+const EXTERNAL = process.env.E2E_BASE_URL;
 export const E2E_DATABASE_URL = process.env.E2E_DATABASE_URL ?? 'postgres://qra:qra@localhost:55432/qr_attendance_test';
 
 export default defineConfig({
@@ -14,15 +19,15 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
-  globalSetup: './e2e/global-setup.ts',
+  globalSetup: EXTERNAL ? undefined : './e2e/global-setup.ts',
   outputDir: './e2e/.results',
   use: {
-    baseURL: `http://localhost:${WEB_PORT}`,
+    baseURL: EXTERNAL ?? `http://localhost:${WEB_PORT}`,
     ...devices['Desktop Chrome'],
     viewport: { width: 1366, height: 820 },
     trace: 'retain-on-failure',
   },
-  webServer: [
+  webServer: EXTERNAL ? undefined : [
     {
       command: 'npx tsx src/server.ts',
       cwd: '../api',

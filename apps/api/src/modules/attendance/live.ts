@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { sql } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
 import pg from 'pg';
-import type { DbOrTx } from '../../db/client.js';
+import { connectionConfig, type DbOrTx } from '../../db/client.js';
 
 const CHANNEL = 'attendance_live';
 const RECONNECT_MS = 1000;
@@ -72,7 +72,7 @@ export class LiveHub {
   }
 
   private async connect(): Promise<void> {
-    const client = new pg.Client({ connectionString: this.databaseUrl });
+    const client = new pg.Client(connectionConfig(this.databaseUrl));
     client.on('notification', (msg) => {
       if (!msg.payload) return;
       try {

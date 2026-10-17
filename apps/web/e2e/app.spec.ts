@@ -9,7 +9,8 @@ import { PNG } from 'pngjs';
  * Screenshots go to e2e/screenshots for review.
  */
 
-const API = 'http://localhost:3100';
+/** API address: the deployment itself when testing one (same origin), else the local test API. */
+const API = process.env.E2E_BASE_URL ?? 'http://localhost:3100';
 const PASSWORD = 'demo-pass-123';
 /** Full-page screenshot once open/close animations have settled. */
 async function shot(page: Page, name: string) {
@@ -213,7 +214,7 @@ test('student and platform owner', async ({ page }) => {
   await shot(page, '18-student-profile');
   await signOut(page);
 
-  await signIn(page, 'owner', 'owner-pass-123', null);
+  await signIn(page, 'owner', process.env.E2E_OWNER_PASSWORD ?? 'owner-pass-123', null);
   await expect(page).toHaveURL(/\/platform\/institutes/);
   await expect(page.getByRole('cell', { name: 'Demo Institute of Technology' })).toBeVisible();
   await shot(page, '19-platform-institutes');

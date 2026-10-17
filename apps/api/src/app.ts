@@ -16,6 +16,7 @@ import { z } from 'zod';
 import type { Config } from './config.js';
 import type { Db } from './db/client.js';
 import { AppError } from './lib/errors.js';
+import { serveWebApp } from './web.js';
 import { LiveHub } from './modules/attendance/live.js';
 import { scanRoutes, sessionRoutes, settingsRoutes } from './modules/attendance/routes.js';
 import { authRoutes } from './modules/auth/routes.js';
@@ -64,7 +65,11 @@ export async function buildApp({ config, db, clock = Date.now }: { config: Confi
   app.decorate('db', db);
   app.decorate('config', config);
   app.decorate('now', () => new Date(clock()));
-  const live = new LiveHub(config.DATABASE_URL, app.log);
+  const listenUrl = config.DATABASE_LISTEN_URL ?? config.DATABASE_URL;
+  if (new URL(listenUrl).hostname.includes('-pooler')) {
+    app.log.warn('Live updates need a direct database connection, not a pooled one: set DATABASE_LISTEN_URL');
+  }
+  const live = new LiveHub(listenUrl, app.log);
   app.decorate('live', live);
   app.addHook('onClose', () => live.stop());
 
@@ -94,9 +99,11 @@ export async function buildApp({ config, db, clock = Date.now }: { config: Confi
   await app.register(swaggerUi, { routePrefix: '/docs' });
 
   app.setErrorHandler(errorHandler);
-  app.setNotFoundHandler((_req, reply) =>
-    reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Route not found' } }),
-  );
+  const webFallback = config.SERVE_WEB ? await serveWebApp(app, config.WEB_DIST_DIR) : null;
+  app.setNotFoundHandler((req, reply) => {
+    if (webFallback?.(req, reply)) return;
+    return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
+  });
 
   app.get(
     '/health',
