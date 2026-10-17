@@ -22,6 +22,13 @@
       "when": 1792160029945,
       "tag": "0002_attendance",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792244120613,
+      "tag": "0003_linked_phones",
+      "breakpoints": true
     }
   ]
 }

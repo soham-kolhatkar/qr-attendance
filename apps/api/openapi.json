@@ -10693,6 +10693,27 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
+                  },
+                  "device": {
+                    "description": "Proof that the scan comes from the student’s linked phone",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "signature": {
+                        "type": "string",
+                        "minLength": 16,
+                        "maxLength": 200,
+                        "description": "Base64 ECDSA P-256 signature of \"QAS1|<device id>|<qr>\""
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "signature"
+                    ]
                   }
                 },
                 "required": [
@@ -10917,6 +10938,270 @@
         }
       }
     },
+    "/v1/attendance/mine": {
+      "get": {
+        "summary": "My attendance for a term: overall, per subject, and recent sessions",
+        "tags": [
+          "attendance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "termId",
+            "required": false,
+            "description": "Default: the term of my latest class"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "term": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "terms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "overall": {
+                      "type": "object",
+                      "properties": {
+                        "present": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "absent": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "excused": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Finished sessions (not cancelled, no longer taking attendance)"
+                        },
+                        "percentage": {
+                          "nullable": true,
+                          "description": "present ÷ (total − excused) × 100; null before the first class",
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "present",
+                        "absent",
+                        "excused",
+                        "total",
+                        "percentage"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "subjects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "offeringId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "present": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "absent": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "excused": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "total": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Finished sessions (not cancelled, no longer taking attendance)"
+                          },
+                          "percentage": {
+                            "nullable": true,
+                            "description": "present ÷ (total − excused) × 100; null before the first class",
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "offeringId",
+                          "subject",
+                          "present",
+                          "absent",
+                          "excused",
+                          "total",
+                          "percentage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "recent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sessionId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "topic": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "present",
+                              "absent",
+                              "excused"
+                            ]
+                          },
+                          "method": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "qr",
+                              "manual"
+                            ]
+                          },
+                          "open": {
+                            "type": "boolean",
+                            "description": "Still taking attendance"
+                          }
+                        },
+                        "required": [
+                          "sessionId",
+                          "startedAt",
+                          "kind",
+                          "topic",
+                          "subject",
+                          "status",
+                          "method",
+                          "open"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "term",
+                    "terms",
+                    "overall",
+                    "subjects",
+                    "recent"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/settings/attendance": {
       "get": {
         "summary": "Attendance settings",
@@ -10953,12 +11238,17 @@
                       "minimum": 1,
                       "maximum": 240,
                       "description": "How long scanning stays open after a session starts"
+                    },
+                    "requireRegisteredPhone": {
+                      "type": "boolean",
+                      "description": "Scans must come from the student’s linked phone. Turn off only while students can’t use the app."
                     }
                   },
                   "required": [
                     "qrRotationSeconds",
                     "qrGraceSeconds",
-                    "defaultScanMinutes"
+                    "defaultScanMinutes",
+                    "requireRegisteredPhone"
                   ],
                   "additionalProperties": false
                 }
@@ -10996,6 +11286,10 @@
                     "minimum": 1,
                     "maximum": 240,
                     "description": "How long scanning stays open after a session starts"
+                  },
+                  "requireRegisteredPhone": {
+                    "type": "boolean",
+                    "description": "Scans must come from the student’s linked phone. Turn off only while students can’t use the app."
                   }
                 }
               }
@@ -11032,12 +11326,1773 @@
                       "minimum": 1,
                       "maximum": 240,
                       "description": "How long scanning stays open after a session starts"
+                    },
+                    "requireRegisteredPhone": {
+                      "type": "boolean",
+                      "description": "Scans must come from the student’s linked phone. Turn off only while students can’t use the app."
                     }
                   },
                   "required": [
                     "qrRotationSeconds",
                     "qrGraceSeconds",
-                    "defaultScanMinutes"
+                    "defaultScanMinutes",
+                    "requireRegisteredPhone"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/challenge": {
+      "post": {
+        "summary": "Start linking this phone: a one-time challenge for the key attestation",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "challenge",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/": {
+      "post": {
+        "summary": "Link this phone (or ask to switch to it) with a hardware key attestation",
+        "tags": [
+          "devices"
+        ],
+        "description": "Active straight away for a first phone or a reinstall on the same phone; otherwise \"pending\" until an admin or HOD approves.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "android"
+                    ]
+                  },
+                  "challenge": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 128
+                  },
+                  "certificateChain": {
+                    "minItems": 2,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 8000
+                    },
+                    "description": "Base64 DER, key certificate first"
+                  },
+                  "phoneId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "description": "ANDROID_ID"
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "osVersion": {
+                    "type": "string",
+                    "maxLength": 50
+                  },
+                  "appVersion": {
+                    "type": "string",
+                    "maxLength": 50
+                  }
+                },
+                "required": [
+                  "platform",
+                  "challenge",
+                  "certificateChain",
+                  "phoneId"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "device": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "android",
+                            "ios"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "active",
+                            "revoked",
+                            "rejected"
+                          ]
+                        },
+                        "model": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "osVersion": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "appVersion": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "securityLevel": {
+                          "type": "string",
+                          "enum": [
+                            "tee",
+                            "strongbox"
+                          ],
+                          "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                        },
+                        "bootState": {
+                          "type": "string",
+                          "enum": [
+                            "verified",
+                            "self_signed",
+                            "unverified",
+                            "failed",
+                            "unknown"
+                          ],
+                          "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                        },
+                        "bootloaderLocked": {
+                          "nullable": true,
+                          "type": "boolean"
+                        },
+                        "osPatchLevel": {
+                          "nullable": true,
+                          "description": "Security patch, e.g. 202609 = September 2026",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "activatedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "endedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "endReason": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "platform",
+                        "status",
+                        "model",
+                        "osVersion",
+                        "appVersion",
+                        "securityLevel",
+                        "bootState",
+                        "bootloaderLocked",
+                        "osPatchLevel",
+                        "createdAt",
+                        "activatedAt",
+                        "endedAt",
+                        "endReason"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "device"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Students’ phones: change requests (pending), linked (active) or past ones",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "page",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "pageSize",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": "pending",
+              "type": "string",
+              "enum": [
+                "pending",
+                "active",
+                "revoked",
+                "rejected"
+              ]
+            },
+            "in": "query",
+            "name": "status",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Name, username or roll number"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "unitId",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "platform": {
+                            "type": "string",
+                            "enum": [
+                              "android",
+                              "ios"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "active",
+                              "revoked",
+                              "rejected"
+                            ]
+                          },
+                          "model": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "osVersion": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "appVersion": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "securityLevel": {
+                            "type": "string",
+                            "enum": [
+                              "tee",
+                              "strongbox"
+                            ],
+                            "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                          },
+                          "bootState": {
+                            "type": "string",
+                            "enum": [
+                              "verified",
+                              "self_signed",
+                              "unverified",
+                              "failed",
+                              "unknown"
+                            ],
+                            "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                          },
+                          "bootloaderLocked": {
+                            "nullable": true,
+                            "type": "boolean"
+                          },
+                          "osPatchLevel": {
+                            "nullable": true,
+                            "description": "Security patch, e.g. 202609 = September 2026",
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "activatedAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "endedAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "endReason": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "student": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "username": {
+                                "type": "string"
+                              },
+                              "fullName": {
+                                "type": "string"
+                              },
+                              "rollNo": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "unitPath": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "username",
+                              "fullName",
+                              "rollNo",
+                              "unitPath"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "replaces": {
+                            "nullable": true,
+                            "description": "For a change request: the phone it would replace",
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "android",
+                                  "ios"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "active",
+                                  "revoked",
+                                  "rejected"
+                                ]
+                              },
+                              "model": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "osVersion": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "appVersion": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "securityLevel": {
+                                "type": "string",
+                                "enum": [
+                                  "tee",
+                                  "strongbox"
+                                ],
+                                "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                              },
+                              "bootState": {
+                                "type": "string",
+                                "enum": [
+                                  "verified",
+                                  "self_signed",
+                                  "unverified",
+                                  "failed",
+                                  "unknown"
+                                ],
+                                "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                              },
+                              "bootloaderLocked": {
+                                "nullable": true,
+                                "type": "boolean"
+                              },
+                              "osPatchLevel": {
+                                "nullable": true,
+                                "description": "Security patch, e.g. 202609 = September 2026",
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "activatedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "endedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "endReason": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "platform",
+                              "status",
+                              "model",
+                              "osVersion",
+                              "appVersion",
+                              "securityLevel",
+                              "bootState",
+                              "bootloaderLocked",
+                              "osPatchLevel",
+                              "createdAt",
+                              "activatedAt",
+                              "endedAt",
+                              "endReason"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "history": {
+                            "type": "object",
+                            "properties": {
+                              "phones": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "lastLinkedAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              }
+                            },
+                            "required": [
+                              "phones",
+                              "lastLinkedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "platform",
+                          "status",
+                          "model",
+                          "osVersion",
+                          "appVersion",
+                          "securityLevel",
+                          "bootState",
+                          "bootloaderLocked",
+                          "osPatchLevel",
+                          "createdAt",
+                          "activatedAt",
+                          "endedAt",
+                          "endReason",
+                          "student",
+                          "replaces",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "pageSize": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "page",
+                    "pageSize"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/mine": {
+      "get": {
+        "summary": "My linked phone, and a phone change waiting for approval",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "android",
+                            "ios"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "active",
+                            "revoked",
+                            "rejected"
+                          ]
+                        },
+                        "model": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "osVersion": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "appVersion": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "securityLevel": {
+                          "type": "string",
+                          "enum": [
+                            "tee",
+                            "strongbox"
+                          ],
+                          "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                        },
+                        "bootState": {
+                          "type": "string",
+                          "enum": [
+                            "verified",
+                            "self_signed",
+                            "unverified",
+                            "failed",
+                            "unknown"
+                          ],
+                          "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                        },
+                        "bootloaderLocked": {
+                          "nullable": true,
+                          "type": "boolean"
+                        },
+                        "osPatchLevel": {
+                          "nullable": true,
+                          "description": "Security patch, e.g. 202609 = September 2026",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "activatedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "endedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "endReason": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "platform",
+                        "status",
+                        "model",
+                        "osVersion",
+                        "appVersion",
+                        "securityLevel",
+                        "bootState",
+                        "bootloaderLocked",
+                        "osPatchLevel",
+                        "createdAt",
+                        "activatedAt",
+                        "endedAt",
+                        "endReason"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pending": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "android",
+                            "ios"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "active",
+                            "revoked",
+                            "rejected"
+                          ]
+                        },
+                        "model": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "osVersion": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "appVersion": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "securityLevel": {
+                          "type": "string",
+                          "enum": [
+                            "tee",
+                            "strongbox"
+                          ],
+                          "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                        },
+                        "bootState": {
+                          "type": "string",
+                          "enum": [
+                            "verified",
+                            "self_signed",
+                            "unverified",
+                            "failed",
+                            "unknown"
+                          ],
+                          "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                        },
+                        "bootloaderLocked": {
+                          "nullable": true,
+                          "type": "boolean"
+                        },
+                        "osPatchLevel": {
+                          "nullable": true,
+                          "description": "Security patch, e.g. 202609 = September 2026",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "activatedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "endedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "endReason": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "platform",
+                        "status",
+                        "model",
+                        "osVersion",
+                        "appVersion",
+                        "securityLevel",
+                        "bootState",
+                        "bootloaderLocked",
+                        "osPatchLevel",
+                        "createdAt",
+                        "activatedAt",
+                        "endedAt",
+                        "endReason"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "active",
+                    "pending"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/pending-count": {
+      "get": {
+        "summary": "How many phone changes are waiting for approval",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/approve": {
+      "post": {
+        "summary": "Approve a phone change; the old phone stops working",
+        "tags": [
+          "devices"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "platform": {
+                      "type": "string",
+                      "enum": [
+                        "android",
+                        "ios"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "active",
+                        "revoked",
+                        "rejected"
+                      ]
+                    },
+                    "model": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "osVersion": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "appVersion": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "securityLevel": {
+                      "type": "string",
+                      "enum": [
+                        "tee",
+                        "strongbox"
+                      ],
+                      "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                    },
+                    "bootState": {
+                      "type": "string",
+                      "enum": [
+                        "verified",
+                        "self_signed",
+                        "unverified",
+                        "failed",
+                        "unknown"
+                      ],
+                      "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                    },
+                    "bootloaderLocked": {
+                      "nullable": true,
+                      "type": "boolean"
+                    },
+                    "osPatchLevel": {
+                      "nullable": true,
+                      "description": "Security patch, e.g. 202609 = September 2026",
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "activatedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "endedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "endReason": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "platform",
+                    "status",
+                    "model",
+                    "osVersion",
+                    "appVersion",
+                    "securityLevel",
+                    "bootState",
+                    "bootloaderLocked",
+                    "osPatchLevel",
+                    "createdAt",
+                    "activatedAt",
+                    "endedAt",
+                    "endReason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/reject": {
+      "post": {
+        "summary": "Turn down a phone change; the old phone keeps working",
+        "tags": [
+          "devices"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "platform": {
+                      "type": "string",
+                      "enum": [
+                        "android",
+                        "ios"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "active",
+                        "revoked",
+                        "rejected"
+                      ]
+                    },
+                    "model": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "osVersion": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "appVersion": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "securityLevel": {
+                      "type": "string",
+                      "enum": [
+                        "tee",
+                        "strongbox"
+                      ],
+                      "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                    },
+                    "bootState": {
+                      "type": "string",
+                      "enum": [
+                        "verified",
+                        "self_signed",
+                        "unverified",
+                        "failed",
+                        "unknown"
+                      ],
+                      "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                    },
+                    "bootloaderLocked": {
+                      "nullable": true,
+                      "type": "boolean"
+                    },
+                    "osPatchLevel": {
+                      "nullable": true,
+                      "description": "Security patch, e.g. 202609 = September 2026",
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "activatedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "endedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "endReason": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "platform",
+                    "status",
+                    "model",
+                    "osVersion",
+                    "appVersion",
+                    "securityLevel",
+                    "bootState",
+                    "bootloaderLocked",
+                    "osPatchLevel",
+                    "createdAt",
+                    "activatedAt",
+                    "endedAt",
+                    "endReason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/revoke": {
+      "post": {
+        "summary": "Unlink a student’s phone (lost, stolen, sold); their next phone links without approval",
+        "tags": [
+          "devices"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "platform": {
+                      "type": "string",
+                      "enum": [
+                        "android",
+                        "ios"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "active",
+                        "revoked",
+                        "rejected"
+                      ]
+                    },
+                    "model": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "osVersion": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "appVersion": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "securityLevel": {
+                      "type": "string",
+                      "enum": [
+                        "tee",
+                        "strongbox"
+                      ],
+                      "description": "tee = the phone’s trusted environment; strongbox = a separate security chip"
+                    },
+                    "bootState": {
+                      "type": "string",
+                      "enum": [
+                        "verified",
+                        "self_signed",
+                        "unverified",
+                        "failed",
+                        "unknown"
+                      ],
+                      "description": "verified = the phone runs its maker’s software; otherwise it may be rooted or modified"
+                    },
+                    "bootloaderLocked": {
+                      "nullable": true,
+                      "type": "boolean"
+                    },
+                    "osPatchLevel": {
+                      "nullable": true,
+                      "description": "Security patch, e.g. 202609 = September 2026",
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "activatedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "endedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "endReason": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "platform",
+                    "status",
+                    "model",
+                    "osVersion",
+                    "appVersion",
+                    "securityLevel",
+                    "bootState",
+                    "bootloaderLocked",
+                    "osPatchLevel",
+                    "createdAt",
+                    "activatedAt",
+                    "endedAt",
+                    "endReason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {}
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
                   ],
                   "additionalProperties": false
                 }

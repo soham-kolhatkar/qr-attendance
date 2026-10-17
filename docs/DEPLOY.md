@@ -69,11 +69,23 @@ owner account exists. Free services have no shell, so this is automatic.
 
 Every push to `master` redeploys automatically. Data in the database is kept.
 
+## The student app and this server
+
+Phones prove they run the genuine student app, signed with the app's release key. The
+server checks that against `ANDROID_SIGNING_CERT_SHA256` in `render.yaml` (a public
+fingerprint, not a secret; the app build prints it). If the app is ever signed with a
+different key — for example by Google Play — add that key's fingerprint, comma-separated.
+
+The app talks to this address by default. Students sign in with the same institute code,
+username and password as on the web.
+
 ## Checking a deployment
 
 A smoke test runs the core path against the live site with a real browser:
 1. A teacher starts a session and opens the projector.
-2. The test reads the QR code from the screen and an absent student scans it.
+2. The test reads the QR code from the screen and submits it as an absent student. A scan
+   needs the student's linked phone, so the server refuses it with "phone required" —
+   which also proves the code was valid — and the test marks the student by hand instead.
 3. Both screens update live, and the code rotates.
 
 It works with existing data, using the DEMO institute (so `SEED_DEMO=true`), and adds at

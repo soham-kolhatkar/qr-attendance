@@ -2,6 +2,7 @@ import {
   ActionIcon,
   AppShell,
   Avatar,
+  Badge,
   Burger,
   Group,
   Menu,
@@ -18,6 +19,7 @@ import {
   IconBuildingCommunity,
   IconCalendarEvent,
   IconChalkboard,
+  IconDeviceMobile,
   IconFileImport,
   IconHierarchy2,
   IconHome,
@@ -37,6 +39,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { Role } from '../api/types';
 import { useAuth, useMe } from '../auth/AuthContext';
 import { ROLE_LABELS } from '../lib/format';
+import { usePendingPhoneCount } from '../pages/admin/PhonesPage';
 import { Logo } from './Logo';
 
 type NavItem = { to: string; label: string; icon: Icon; roles: Role[] };
@@ -47,6 +50,7 @@ const NAV: NavItem[] = [
   { to: '/classes', label: 'My classes', icon: IconChalkboard, roles: ['admin', 'hod', 'faculty'] },
   { to: '/sessions', label: 'Sessions', icon: IconCalendarEvent, roles: ['admin', 'hod', 'faculty'] },
   { to: '/students', label: 'Students', icon: IconSchool, roles: ['admin', 'hod'] },
+  { to: '/phones', label: 'Phones', icon: IconDeviceMobile, roles: ['admin', 'hod'] },
   { to: '/groups', label: 'Batches & groups', icon: IconUsersGroup, roles: ['admin', 'hod'] },
   { to: '/offerings', label: 'Offerings', icon: IconBooks, roles: ['admin', 'hod'] },
   { to: '/catalog', label: 'Terms & subjects', icon: IconNotebook, roles: ['admin', 'hod'] },
@@ -65,6 +69,7 @@ export function AppLayout() {
   const location = useLocation();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const items = NAV.filter((n) => n.roles.includes(me.user.role));
+  const pendingPhones = usePendingPhoneCount(me.user.role === 'admin' || me.user.role === 'hod');
 
   return (
     <AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
@@ -130,6 +135,13 @@ export function AppLayout() {
               end={item.to === '/'}
               label={item.label}
               leftSection={<item.icon size={18} stroke={1.6} />}
+              rightSection={
+                item.to === '/phones' && pendingPhones.data ? (
+                  <Badge size="sm" circle color="orange" aria-label={`${pendingPhones.data} waiting`}>
+                    {pendingPhones.data}
+                  </Badge>
+                ) : undefined
+              }
               active={item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)}
               onClick={close}
             />

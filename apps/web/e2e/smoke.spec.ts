@@ -5,7 +5,8 @@ import { PNG } from 'pngjs';
 /**
  * Deployment smoke test: the core attendance path against a live deployment that
  * already has data (unlike app.spec.ts, which needs a freshly seeded database).
- * Uses the DEMO institute (SEED_DEMO=true) and adds at most one session to it.
+ * Uses the DEMO institute (SEED_DEMO=true) and adds at most one session to it. A
+ * scan needs a linked phone, so the student is marked by hand when one is required.
  *
  *   E2E_BASE_URL=https://<your-app>.onrender.com npx playwright test smoke.spec.ts
  */
@@ -84,7 +85,17 @@ test('a teacher takes attendance and a student scans, live on the deployment', a
   const t0 = Date.now();
   const scan = await api('/v1/attendance/scan', studentToken, { method: 'POST', data: { qr: scanned } });
   const scanMs = Date.now() - t0;
-  expect(scan.status, JSON.stringify(scan.body)).toBe(200);
+  // Scans must be signed by the student's linked phone, which this test doesn't have. The
+  // server checks the code first, so "phone required" also proves the code was valid.
+  const phoneRequired = scan.status === 403 && scan.body?.error?.code === 'DEVICE_REQUIRED';
+  expect(phoneRequired || scan.status === 200, JSON.stringify(scan.body)).toBe(true);
+  if (phoneRequired) {
+    // Mark the student by hand instead, which travels the same live path.
+    await page.getByRole('row', { name: new RegExp(absentee!.fullName) }).getByRole('checkbox').check();
+    await page.getByRole('button', { name: 'Present', exact: true }).click();
+    await page.getByRole('dialog').getByText('No phone').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Mark present' }).click();
+  }
 
   // Live updates travel API → Postgres NOTIFY → server-sent events to both screens.
   await expect(projector.getByText(`${before.present + 1} / ${before.total}`)).toBeVisible({ timeout: 10_000 });
@@ -103,5 +114,8 @@ test('a teacher takes attendance and a student scans, live on the deployment', a
     await expect(projector.getByText('Attendance closed')).toBeVisible({ timeout: 10_000 });
   }
   test.info().annotations.push({ type: 'scan round trip', description: `${scanMs} ms from this machine` });
-  console.log(`scan round trip from this machine: ${scanMs} ms; session ${startedHere ? 'started and closed by the test' : 'already open, left open'}`);
+  console.log(
+    `scan round trip from this machine: ${scanMs} ms (${phoneRequired ? 'refused: phone required, marked by hand' : 'accepted'}); ` +
+      `session ${startedHere ? 'started and closed by the test' : 'already open, left open'}`,
+  );
 });

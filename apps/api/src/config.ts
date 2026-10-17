@@ -33,6 +33,25 @@ const envSchema = z.object({
    */
   SERVE_WEB: z.stringbool().default(false),
   WEB_DIST_DIR: z.string().default(DEFAULT_WEB_DIST),
+  /** The student app's Android package name. Phones must prove they run this app to be linked. */
+  ANDROID_PACKAGE_NAME: z.string().default('com.qrattendance.student'),
+  /**
+   * SHA-256 fingerprints of the certificates the Android app is signed with (hex, colons
+   * optional, comma-separated). A copy of the app re-signed by anyone else is refused.
+   * Empty accepts any signer — for development only.
+   */
+  ANDROID_SIGNING_CERT_SHA256: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim().replaceAll(':', '').toLowerCase())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().regex(/^[0-9a-f]{64}$/, 'Each fingerprint must be 64 hex characters'))),
+  /** Check Google's list of revoked attestation keys when a phone is linked. */
+  ATTESTATION_REVOCATION_CHECK: z.stringbool().default(true),
 });
 
 export type Config = z.infer<typeof envSchema>;

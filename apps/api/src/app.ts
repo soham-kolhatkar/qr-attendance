@@ -29,6 +29,12 @@ import { offeringRoutes } from './modules/offerings/routes.js';
 import { structureRoutes } from './modules/structure/routes.js';
 import { studentRoutes } from './modules/students/routes.js';
 import { directoryRoutes, userRoutes } from './modules/users/routes.js';
+import {
+  type AndroidAttestationPolicy,
+  GOOGLE_ATTESTATION_ROOTS,
+  googleRevocationList,
+} from './modules/devices/attestation.js';
+import { deviceRoutes } from './modules/devices/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -38,6 +44,8 @@ declare module 'fastify' {
     live: LiveHub;
     /** Current time. Injectable so tests can move the clock. */
     now(): Date;
+    /** What a phone must prove to be linked to a student. */
+    attestation: AndroidAttestationPolicy;
   }
   interface FastifyContextConfig {
     /**
@@ -48,7 +56,18 @@ declare module 'fastify' {
   }
 }
 
-export async function buildApp({ config, db, clock = Date.now }: { config: Config; db: Db; clock?: () => number }) {
+export async function buildApp({
+  config,
+  db,
+  clock = Date.now,
+  attestation,
+}: {
+  config: Config;
+  db: Db;
+  clock?: () => number;
+  /** Overrides for tests (e.g. a test root certificate). */
+  attestation?: Partial<AndroidAttestationPolicy>;
+}) {
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
     logger:
@@ -72,6 +91,17 @@ export async function buildApp({ config, db, clock = Date.now }: { config: Confi
   const live = new LiveHub(listenUrl, app.log);
   app.decorate('live', live);
   app.addHook('onClose', () => live.stop());
+
+  app.decorate('attestation', {
+    roots: GOOGLE_ATTESTATION_ROOTS,
+    packageName: config.ANDROID_PACKAGE_NAME,
+    signingCertDigests: config.ANDROID_SIGNING_CERT_SHA256,
+    revokedSerials: config.ATTESTATION_REVOCATION_CHECK ? googleRevocationList(app.log) : async () => new Set<string>(),
+    ...attestation,
+  });
+  if (config.NODE_ENV === 'production' && config.ANDROID_SIGNING_CERT_SHA256.length === 0) {
+    app.log.warn('ANDROID_SIGNING_CERT_SHA256 is not set: a modified, re-signed copy of the student app could link phones');
+  }
 
   await app.register(cors, { origin: config.CORS_ORIGINS.length > 0 ? config.CORS_ORIGINS : false });
   // Limits are opted into per route. The preHandler hook runs after body parsing so
@@ -150,6 +180,7 @@ export async function buildApp({ config, db, clock = Date.now }: { config: Confi
   await app.register(sessionRoutes, { prefix: '/v1/sessions' });
   await app.register(scanRoutes, { prefix: '/v1/attendance' });
   await app.register(settingsRoutes, { prefix: '/v1/settings' });
+  await app.register(deviceRoutes, { prefix: '/v1/devices' });
 
   return app;
 }

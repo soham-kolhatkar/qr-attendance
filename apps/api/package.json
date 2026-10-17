@@ -25,6 +25,10 @@
     "@fastify/swagger": "^9.9.2",
     "@fastify/swagger-ui": "^6.1.2",
     "@node-rs/argon2": "^2.2.2",
+    "@peculiar/asn1-android": "^2.11.0",
+    "@peculiar/asn1-schema": "^2.11.0",
+    "@peculiar/asn1-x509": "^2.11.0",
+    "asn1js": "^3.1.0",
     "csv-parse": "^7.0.3",
     "drizzle-orm": "^0.45.4",
     "exceljs": "^4.4.0",
@@ -35,9 +39,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@peculiar/x509": "^2.2.0",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "reflect-metadata": "^0.2.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

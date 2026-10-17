@@ -2,7 +2,8 @@
   "name": "qr-attendance",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/api",
+    "apps/web"
   ],
   "engines": {
     "node": ">=24"

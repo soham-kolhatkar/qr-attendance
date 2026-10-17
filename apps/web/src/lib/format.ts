@@ -28,3 +28,14 @@ export const STATUS_COLORS: Record<string, string> = { present: 'teal', absent: 
 export const percent = (part: number, total: number) => (total === 0 ? 0 : Math.round((part / total) * 100));
 
 export const KIND_LABELS: Record<string, string> = { lecture: 'Lecture', lab: 'Lab', tutorial: 'Tutorial', other: 'Other' };
+
+/** "2 days ago" style, for how long something has been waiting. */
+const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+export function formatAgo(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return '—';
+  const minutes = Math.round((new Date(iso).getTime() - now) / 60_000);
+  if (Math.abs(minutes) < 60) return relative.format(minutes, 'minute');
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 24) return relative.format(hours, 'hour');
+  return relative.format(Math.round(hours / 24), 'day');
+}

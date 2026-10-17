@@ -1,0 +1,156 @@
+import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { Pressable, RefreshControl, View } from 'react-native';
+import { api, errorMessage, unwrap } from '@/api/client';
+import { attendanceQueryKey } from '@/api/queries';
+import type { MyAttendance } from '@/api/types';
+import { useMe } from '@/auth/AuthContext';
+import { formatWhen, KIND_LABELS } from '@/lib/format';
+import { Banner, Button, Card, Icon, ProgressBar, Screen, Text } from '@/ui/components';
+import { type Colors, radius, space, useColors } from '@/ui/theme';
+
+/** Many institutes require 75% attendance; below that the numbers turn orange, then red. */
+function percentColor(colors: Colors, percentage: number | null) {
+  if (percentage === null) return colors.textDim;
+  if (percentage >= 75) return colors.success;
+  return percentage >= 60 ? colors.warning : colors.danger;
+}
+
+export default function HomeScreen() {
+  const me = useMe();
+  const colors = useColors();
+  const attendance = useQuery({
+    queryKey: attendanceQueryKey,
+    queryFn: async () => unwrap(await api().GET('/v1/attendance/mine')),
+  });
+  const data = attendance.data;
+  const firstName = me.user.fullName.split(' ')[0];
+
+  return (
+    <Screen refreshControl={<RefreshControl refreshing={attendance.isRefetching} onRefresh={() => void attendance.refetch()} />}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="title">Hi, {firstName}</Text>
+          {me.student && (
+            <Text dim numberOfLines={1}>
+              {me.student.unitPath.join(' › ')}
+              {me.student.rollNo ? ` · Roll ${me.student.rollNo}` : ''}
+            </Text>
+          )}
+        </View>
+        <Pressable
+          onPress={() => router.push('/account')}
+          accessibilityRole="button"
+          accessibilityLabel="Account"
+          hitSlop={12}
+          style={{ padding: space.sm, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted }}
+        >
+          <Icon name="account-outline" size={26} />
+        </Pressable>
+      </View>
+
+      <Button title="Scan attendance QR" icon="qrcode-scan" size="lg" onPress={() => router.push('/scan')} />
+
+      {attendance.isError && <Banner tone="danger" title="Couldn't load your attendance">{errorMessage(attendance.error)}</Banner>}
+      {attendance.isPending && (
+        <Text dim align="center">
+          Loading your attendance…
+        </Text>
+      )}
+      {data && <Summary data={data} />}
+    </Screen>
+  );
+}
+
+function Summary({ data }: { data: MyAttendance }) {
+  const colors = useColors();
+  if (!data.term) {
+    return (
+      <Card>
+        <Text variant="heading">No classes yet</Text>
+        <Text dim>Your attendance will appear here after your first class.</Text>
+      </Card>
+    );
+  }
+  const overall = data.overall;
+  return (
+    <>
+      <Card>
+        <Text variant="caption" dim>
+          {data.term.name}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
+          <Text style={{ fontSize: 44, lineHeight: 50, fontWeight: '700' }} color={percentColor(colors, overall.percentage)}>
+            {overall.percentage === null ? '—' : `${Math.round(overall.percentage)}%`}
+          </Text>
+          <Text dim>overall</Text>
+        </View>
+        <Text dim>
+          Present in {overall.present} of {overall.total - overall.excused} classes
+          {overall.excused > 0 ? ` (${overall.excused} excused)` : ''}.
+        </Text>
+      </Card>
+
+      {data.subjects.length > 0 && (
+        <Card>
+          <Text variant="heading">Subjects</Text>
+          {data.subjects.map((s) => (
+            <View key={s.offeringId} style={{ gap: space.xs }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
+                <Text variant="label" style={{ flex: 1 }} numberOfLines={1}>
+                  {s.subject.name}
+                </Text>
+                <Text variant="label" color={percentColor(colors, s.percentage)}>
+                  {s.percentage === null ? '—' : `${Math.round(s.percentage)}%`}
+                </Text>
+              </View>
+              <ProgressBar value={s.percentage ?? 0} color={percentColor(colors, s.percentage)} />
+              <Text variant="caption" dim>
+                {s.subject.code} · {s.present}/{s.total - s.excused} present
+              </Text>
+            </View>
+          ))}
+        </Card>
+      )}
+
+      {data.recent.length > 0 && (
+        <Card>
+          <Text variant="heading">Recent classes</Text>
+          {data.recent.map((r) => (
+            <View key={r.sessionId} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <View style={{ flex: 1 }}>
+                <Text variant="label" numberOfLines={1}>
+                  {r.subject.name}
+                </Text>
+                <Text variant="caption" dim numberOfLines={1}>
+                  {KIND_LABELS[r.kind] ?? 'Class'} · {formatWhen(r.startedAt)}
+                  {r.topic ? ` · ${r.topic}` : ''}
+                </Text>
+              </View>
+              <StatusChip status={r.status} open={r.open} />
+            </View>
+          ))}
+        </Card>
+      )}
+    </>
+  );
+}
+
+function StatusChip({ status, open }: { status: 'present' | 'absent' | 'excused'; open: boolean }) {
+  const colors = useColors();
+  const pending = open && status === 'absent';
+  const look = pending
+    ? { label: 'Not marked yet', fg: colors.textDim, bg: colors.surfaceMuted }
+    : {
+        present: { label: 'Present', fg: colors.success, bg: colors.successSoft },
+        absent: { label: 'Absent', fg: colors.danger, bg: colors.dangerSoft },
+        excused: { label: 'Excused', fg: colors.warning, bg: colors.warningSoft },
+      }[status];
+  return (
+    <View style={{ backgroundColor: look.bg, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 }}>
+      <Text variant="caption" color={look.fg} style={{ fontWeight: '600' }}>
+        {look.label}
+      </Text>
+    </View>
+  );
+}

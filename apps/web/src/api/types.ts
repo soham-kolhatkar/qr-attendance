@@ -26,6 +26,9 @@ export type QrConfig = Ok<'/v1/sessions/{id}/qr-config', 'get'>;
 export type AttendanceSettings = Ok<'/v1/settings/attendance', 'get'>;
 export type Institute = Ok<'/v1/platform/institutes', 'get'>['items'][number];
 export type ImportReport = Ok<'/v1/imports/students', 'post'>;
+export type ManagedDevice = Ok<'/v1/devices/', 'get'>['items'][number];
+export type Device = Ok<'/v1/devices/{id}/approve', 'post'>;
+export type DeviceStatus = Device['status'];
 export type AttendanceStatus = SessionRecord['status'];
 export type SessionCounts = Session['counts'];
 

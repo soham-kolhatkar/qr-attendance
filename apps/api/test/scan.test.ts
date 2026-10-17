@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateQrSecret, qrPayload, stepAt } from '../src/modules/attendance/qr.js';
-import { as, expectStatus, login, loginStudent, setupClass, setupInstitute, useTestApp } from './helpers.js';
+import { as, expectStatus, login, loginStudent, setupClass, setupInstitute, signedScan, useTestApp } from './helpers.js';
 
 const ctx = useTestApp();
 
@@ -11,7 +11,7 @@ async function openSession() {
   return { ...c, session, currentQr };
 }
 
-const scan = async (tokens: Parameters<typeof as>[1], qr: string) => as(ctx.app, tokens).post('/v1/attendance/scan', { qr });
+const scan = (tokens: Parameters<typeof as>[1], qr: string) => signedScan(ctx, tokens, qr);
 
 describe('scanning', () => {
   it('marks the student present and tells them which class it was', async () => {
@@ -113,7 +113,8 @@ describe('scanning', () => {
 
   it('is for students only', async () => {
     const c = await openSession();
-    expect((await scan(c.profTokens, await c.currentQr())).statusCode).toBe(403);
+    const res = await as(ctx.app, c.profTokens).post('/v1/attendance/scan', { qr: await c.currentQr() });
+    expect(res.statusCode).toBe(403);
   });
 
   it('handles a whole class scanning at the same moment', async () => {
