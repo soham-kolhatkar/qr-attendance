@@ -38,6 +38,7 @@ import { api, unwrap } from '../../api/client';
 import { useApiMutation } from '../../api/mutations';
 import type { AttendanceStatus, LiveEvent, Session, SessionRecord } from '../../api/types';
 import { PageHeader, QueryState } from '../../components/common';
+import { CorrectionList } from '../../components/corrections';
 import { openFormModal } from '../../components/FormModal';
 import { formatCountdown, formatDateTime, formatTime, KIND_LABELS, percent, STATUS_COLORS } from '../../lib/format';
 import { useLiveSession } from '../../lib/live';
@@ -288,10 +289,33 @@ function SessionView({
         </Grid.Col>
       </Grid>
 
+      <SessionRequests sessionId={session.id} />
       <QueryState query={recordsQuery}>
         {records && <RecordsTable session={session} records={records} />}
       </QueryState>
     </>
+  );
+}
+
+/** Students of this class asking for their mark to be corrected. */
+function SessionRequests({ sessionId }: { sessionId: string }) {
+  const pending = useQuery({
+    queryKey: ['corrections', { status: 'pending', sessionId }],
+    queryFn: async () =>
+      unwrap(await api.GET('/v1/corrections/', { params: { query: { status: 'pending', sessionId, pageSize: 50 } } })),
+  });
+  const items = pending.data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <Card withBorder padding="lg" mb="md">
+      <Title order={4} mb={4}>
+        Correction requests
+      </Title>
+      <Text size="sm" c="dimmed" mb="md">
+        {items.length === 1 ? 'A student asks' : `${items.length} students ask`} for their mark in this class to be changed.
+      </Text>
+      <CorrectionList items={items} showSession={false} />
+    </Card>
   );
 }
 

@@ -108,6 +108,7 @@ test('admin screens', async ({ page }) => {
   await expect(page.getByLabel('QR code changes every (seconds)')).toHaveValue('5');
   await expect(page.getByLabel('Students must scan with their linked phone')).toBeChecked();
   await expect(page.getByLabel('Students below this are listed as defaulters')).toHaveValue('75%');
+  await expect(page.getByLabel('Remind students who are below the minimum')).toBeChecked();
   await shot(page, '08-settings');
 });
 
@@ -291,6 +292,69 @@ test('teacher opens the class register', async ({ page }) => {
   await page.getByRole('button', { name: 'Download' }).click();
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /PDF/ }).click()]);
   expect(pdf.suggestedFilename()).toMatch(/^register-cs301-.*\.pdf$/);
+});
+
+test('corrections: students ask, the teacher answers, the student hears back', async ({ page, request }) => {
+  // Kabir and Meera missed the "Stacks and queues" lecture above. Kabir asks from the app
+  // (here, through the API the app uses)...
+  const kabir = await (
+    await request.post(`${API}/v1/auth/login`, { data: { instituteCode: 'DEMO', username: '2024comp003', password: PASSWORD } })
+  ).json();
+  const auth = { authorization: `Bearer ${kabir.accessToken}` };
+  const mine = await (await request.get(`${API}/v1/attendance/mine`, { headers: auth })).json();
+  const missed = mine.recent.find((r: { topic: string }) => r.topic === 'Stacks and queues');
+  expect(missed.canRequest).toEqual(['present', 'excused']);
+  const asked = await request.post(`${API}/v1/corrections/`, {
+    headers: auth,
+    data: { sessionId: missed.sessionId, requestedStatus: 'present', reason: 'I sat at the back; the app kept saying the code had changed.' },
+  });
+  expect(asked.status()).toBe(201);
+
+  // ...and Meera on the website.
+  await signIn(page, '2024comp004');
+  await page.locator('.mantine-Group-root').filter({ hasText: 'Stacks and queues' }).getByRole('button', { name: 'Ask to correct' }).click();
+  const ask = page.getByRole('dialog');
+  await ask.getByText('I had a valid reason').click();
+  await ask.getByLabel('What happened').fill('I was at the hospital for a check-up.');
+  await shot(page, '25-student-asks');
+  await ask.getByRole('button', { name: 'Send request' }).click();
+  await expect(page.locator('.mantine-Group-root').filter({ hasText: 'Stacks and queues' }).getByText('Correction asked')).toBeVisible();
+  await signOut(page);
+
+  // The teacher sees both waiting, approves Kabir's and turns down Meera's.
+  await signIn(page, 'prof.sharma');
+  await page.getByRole('link', { name: /Corrections/ }).click();
+  await expect(page.getByRole('heading', { name: 'Correction requests' })).toBeVisible();
+  const kabirsCard = page.locator('.mantine-Card-root', { hasText: 'the app kept saying the code had changed' });
+  const meerasCard = page.locator('.mantine-Card-root', { hasText: 'at the hospital for a check-up' });
+  await expect(meerasCard.getByText('Meera Kulkarni')).toBeVisible();
+  await shot(page, '26-corrections');
+  await kabirsCard.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.getByText('Kabir Joshi is now marked present')).toBeVisible();
+  await meerasCard.getByRole('button', { name: 'Turn down' }).click();
+  await page.getByRole('dialog').getByLabel('Reply to the student').fill('Please bring the hospital note to the office first.');
+  await page.getByRole('dialog').getByRole('button', { name: 'Turn down' }).click();
+  await expect(kabirsCard).toHaveCount(0);
+  await expect(meerasCard).toHaveCount(0);
+  await page.getByText('Turned down', { exact: true }).click();
+  await expect(page.locator('.mantine-Card-root', { hasText: 'at the hospital for a check-up' }).getByText('Please bring the hospital note')).toBeVisible();
+  await signOut(page);
+
+  // Kabir hears back.
+  await signIn(page, '2024comp003');
+  await page.getByRole('button', { name: /^Notifications, [1-9]/ }).click();
+  await expect(page.getByText('Correction approved: CS301')).toBeVisible();
+  await shot(page, '27-student-notifications');
+  await page.keyboard.press('Escape');
+  await signOut(page);
+
+  // And it's all in the activity log.
+  await signIn(page, 'admin');
+  await page.getByRole('link', { name: 'Activity' }).click();
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
+  await expect(page.getByText(/^Approved Kabir Joshi’s correction for CS301/)).toBeVisible();
+  await expect(page.getByText(/^Turned down Meera Kulkarni’s correction for CS301/)).toBeVisible();
+  await shot(page, '28-activity');
 });
 
 test('HOD sees their department', async ({ page }) => {

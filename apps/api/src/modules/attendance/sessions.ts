@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, gte, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
 import type { Db, DbOrTx } from '../../db/client.js';
 import {
+  attendanceCorrections,
   attendanceRecords,
   attendanceSessions,
   offerings,
@@ -23,6 +24,9 @@ import {
   visibilityCondition,
 } from '../offerings/service.js';
 import { loadUnitIndex } from '../structure/service.js';
+import { attendanceChanged, type ClassRef, correctionApproved } from '../notifications/messages.js';
+import { notify } from '../notifications/service.js';
+import { instituteTimezone } from '../reports/query.js';
 import { markOfferingsStale } from '../reports/tallies.js';
 import type { LiveHub, SessionCounts } from './live.js';
 import { generateQrSecret, qrPayload, stepAt, stepEndsAt } from './qr.js';
@@ -520,6 +524,11 @@ export async function cancelSession(
       .where(eq(attendanceSessions.id, sessionId))
       .returning();
     await markOfferingsStale(tx, [s.offeringId]);
+    // A cancelled class no longer counts, so there's nothing left to correct.
+    await tx
+      .update(attendanceCorrections)
+      .set({ status: 'withdrawn', reviewedBy: auth.userId, reviewedAt: now, reviewNote: 'The class was cancelled' })
+      .where(and(eq(attendanceCorrections.sessionId, sessionId), eq(attendanceCorrections.status, 'pending')));
     await writeAudit(tx, {
       instituteId: auth.instituteId,
       actorUserId: auth.userId,
@@ -570,53 +579,138 @@ export async function markRecords(
   now: Date,
   ip?: string,
 ): Promise<{ updated: number; counts: SessionCounts }> {
-  const studentIds = [...new Set(input.studentIds)];
   return db.transaction(async (tx) => {
     const s = await findManagedSession(tx, auth, scope, sessionId);
     if (s.status === 'cancelled') throw conflict('SESSION_CANCELLED', 'This session was cancelled');
-
-    const before = await tx
-      .select({ studentId: attendanceRecords.studentId, status: attendanceRecords.status, fullName: users.fullName, rollNo: students.rollNo })
-      .from(attendanceRecords)
-      .innerJoin(users, eq(users.id, attendanceRecords.studentId))
-      .innerJoin(students, eq(students.userId, attendanceRecords.studentId))
-      .where(and(eq(attendanceRecords.sessionId, sessionId), inArray(attendanceRecords.studentId, studentIds)));
-    if (before.length !== studentIds.length) {
-      const found = new Set(before.map((r) => r.studentId));
-      throw notInSession(studentIds.filter((id) => !found.has(id)));
-    }
-
-    await tx
-      .update(attendanceRecords)
-      .set({ status: input.status, method: 'manual', markedAt: now, markedBy: auth.userId, reason: input.reason, qrStep: null, ip: null })
-      .where(and(eq(attendanceRecords.sessionId, sessionId), inArray(attendanceRecords.studentId, studentIds)));
-    await markOfferingsStale(tx, [s.offeringId]);
-
-    await writeAudit(tx, {
-      instituteId: auth.instituteId,
-      actorUserId: auth.userId,
-      action: 'attendance.marked_manually',
-      entityType: 'attendance_session',
-      entityId: sessionId,
-      data: {
-        status: input.status,
-        reason: input.reason,
-        changes: before.map((r) => ({ studentId: r.studentId, from: r.status, to: input.status })),
-      },
-      ip,
-    });
-
-    const counts = (await sessionCounts(tx, [sessionId])).get(sessionId)!;
-    for (const r of before) {
-      await hub.publish(tx, {
-        type: 'marked',
-        sessionId,
-        student: { id: r.studentId, fullName: r.fullName, rollNo: r.rollNo },
-        status: input.status,
-        method: 'manual',
-        counts,
-      });
-    }
-    return { updated: before.length, counts };
+    return applyMarks(tx, hub, auth, s, input, now, ip);
   });
+}
+
+/** The class as notifications describe it. */
+export async function classRef(db: DbOrTx, session: Pick<SessionRow, 'id' | 'offeringId' | 'kind' | 'startedAt' | 'instituteId'>): Promise<ClassRef> {
+  const [row] = await db
+    .select({ code: subjects.code, name: subjects.name })
+    .from(offerings)
+    .innerJoin(subjects, eq(subjects.id, offerings.subjectId))
+    .where(eq(offerings.id, session.offeringId));
+  return {
+    sessionId: session.id,
+    subjectCode: row!.code,
+    subjectName: row!.name,
+    kind: session.kind,
+    startedAt: session.startedAt,
+    timezone: await instituteTimezone(db, session.instituteId),
+  };
+}
+
+/**
+ * Changes marks by hand inside the caller's transaction: records, report totals, the
+ * audit log, live screens, and a notification to each student whose mark changed. A
+ * student's pending correction asking for exactly this mark is settled as approved.
+ * When `correction` is given, the change is that request being approved: it is
+ * audited as such, and the caller resolves the request and tells the student.
+ */
+export async function applyMarks(
+  tx: DbOrTx,
+  hub: LiveHub,
+  auth: InstituteAuthContext,
+  s: SessionRow,
+  input: { studentIds: string[]; status: AttendanceStatus; reason: string },
+  now: Date,
+  ip?: string,
+  correction?: { id: string; note: string | null },
+): Promise<{ updated: number; counts: SessionCounts }> {
+  const studentIds = [...new Set(input.studentIds)];
+  const sessionId = s.id;
+  const before = await tx
+    .select({ studentId: attendanceRecords.studentId, status: attendanceRecords.status, fullName: users.fullName, rollNo: students.rollNo })
+    .from(attendanceRecords)
+    .innerJoin(users, eq(users.id, attendanceRecords.studentId))
+    .innerJoin(students, eq(students.userId, attendanceRecords.studentId))
+    .where(and(eq(attendanceRecords.sessionId, sessionId), inArray(attendanceRecords.studentId, studentIds)));
+  if (before.length !== studentIds.length) {
+    const found = new Set(before.map((r) => r.studentId));
+    throw notInSession(studentIds.filter((id) => !found.has(id)));
+  }
+
+  await tx
+    .update(attendanceRecords)
+    .set({ status: input.status, method: 'manual', markedAt: now, markedBy: auth.userId, reason: input.reason, qrStep: null, ip: null })
+    .where(and(eq(attendanceRecords.sessionId, sessionId), inArray(attendanceRecords.studentId, studentIds)));
+  await markOfferingsStale(tx, [s.offeringId]);
+
+  const changes = before.map((r) => ({ studentId: r.studentId, from: r.status, to: input.status }));
+  await writeAudit(
+    tx,
+    correction
+      ? {
+          instituteId: auth.instituteId,
+          actorUserId: auth.userId,
+          action: 'correction.approved',
+          entityType: 'correction',
+          entityId: correction.id,
+          data: { sessionId, ...changes[0], note: correction.note },
+          ip,
+        }
+      : {
+          instituteId: auth.instituteId,
+          actorUserId: auth.userId,
+          action: 'attendance.marked_manually',
+          entityType: 'attendance_session',
+          entityId: sessionId,
+          data: { status: input.status, reason: input.reason, changes },
+          ip,
+        },
+  );
+
+  if (!correction) {
+    // Asked for exactly this: the request is settled.
+    const settled = await tx
+      .update(attendanceCorrections)
+      .set({ status: 'approved', reviewedBy: auth.userId, reviewedAt: now, reviewNote: 'Marked by hand' })
+      .where(
+        and(
+          eq(attendanceCorrections.sessionId, sessionId),
+          inArray(attendanceCorrections.studentId, studentIds),
+          eq(attendanceCorrections.status, 'pending'),
+          eq(attendanceCorrections.requestedStatus, input.status),
+        ),
+      )
+      .returning({ id: attendanceCorrections.id, studentId: attendanceCorrections.studentId });
+    const settledFor = new Map(settled.map((c) => [c.studentId, c.id]));
+    const changed = before.filter((r) => r.status !== input.status);
+    if (changed.length > 0) {
+      const ref = await classRef(tx, s);
+      const by = await actorName(tx, auth.userId);
+      await notify(
+        tx,
+        changed.map((r) => ({
+          instituteId: auth.instituteId,
+          userId: r.studentId,
+          ...(settledFor.has(r.studentId)
+            ? correctionApproved(ref, settledFor.get(r.studentId)!, by, input.status)
+            : attendanceChanged(ref, by, input.status, input.reason)),
+        })),
+        now,
+      );
+    }
+  }
+
+  const counts = (await sessionCounts(tx, [sessionId])).get(sessionId)!;
+  for (const r of before) {
+    await hub.publish(tx, {
+      type: 'marked',
+      sessionId,
+      student: { id: r.studentId, fullName: r.fullName, rollNo: r.rollNo },
+      status: input.status,
+      method: 'manual',
+      counts,
+    });
+  }
+  return { updated: before.length, counts };
+}
+
+export async function actorName(db: DbOrTx, userId: string): Promise<string> {
+  const [row] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, userId));
+  return row?.fullName ?? 'Someone';
 }

@@ -4969,6 +4969,8 @@ export interface paths {
                             } | null;
                             /** @description The institute's minimum attendance percentage */
                             minimumPercent: number;
+                            /** @description Days after a class within which you can ask for a correction; 0 = not in the app */
+                            correctionWindowDays: number;
                             terms: {
                                 /** Format: uuid */
                                 id: string;
@@ -5015,6 +5017,24 @@ export interface paths {
                                 method: "qr" | "manual" | null;
                                 /** @description Still taking attendance */
                                 open: boolean;
+                                /** @description Your latest correction request for this class */
+                                correction: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** @enum {string} */
+                                    status: "pending" | "approved" | "rejected" | "withdrawn";
+                                    /** @enum {string} */
+                                    requestedStatus: "present" | "excused";
+                                    reason: string;
+                                    /** @description The teacher's reply */
+                                    reviewNote: string | null;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                    /** Format: date-time */
+                                    reviewedAt: string | null;
+                                } | null;
+                                /** @description What you can ask to be marked instead, now; empty when you can’t ask */
+                                canRequest: ("present" | "excused")[];
                             }[];
                         };
                     };
@@ -5063,6 +5083,12 @@ export interface paths {
                             requireRegisteredPhone: boolean;
                             /** @description Students below this attendance percentage are listed as defaulters */
                             minimumPercent: number;
+                            /** @description How many days after a class students can ask in the app for their mark to be corrected; 0 turns requests off */
+                            correctionWindowDays: number;
+                            /** @description Remind students below the minimum on their phone and by email, at most once a week (after 5 classes) */
+                            lowAttendanceAlerts: boolean;
+                            /** @description Email teachers, HODs and admins on Monday mornings with the students below the minimum */
+                            weeklyStaffSummary: boolean;
                         };
                     };
                 };
@@ -5094,6 +5120,12 @@ export interface paths {
                         requireRegisteredPhone?: boolean;
                         /** @description Students below this attendance percentage are listed as defaulters */
                         minimumPercent?: number;
+                        /** @description How many days after a class students can ask in the app for their mark to be corrected; 0 turns requests off */
+                        correctionWindowDays?: number;
+                        /** @description Remind students below the minimum on their phone and by email, at most once a week (after 5 classes) */
+                        lowAttendanceAlerts?: boolean;
+                        /** @description Email teachers, HODs and admins on Monday mornings with the students below the minimum */
+                        weeklyStaffSummary?: boolean;
                     };
                 };
             };
@@ -5115,6 +5147,12 @@ export interface paths {
                             requireRegisteredPhone: boolean;
                             /** @description Students below this attendance percentage are listed as defaulters */
                             minimumPercent: number;
+                            /** @description How many days after a class students can ask in the app for their mark to be corrected; 0 turns requests off */
+                            correctionWindowDays: number;
+                            /** @description Remind students below the minimum on their phone and by email, at most once a week (after 5 classes) */
+                            lowAttendanceAlerts: boolean;
+                            /** @description Email teachers, HODs and admins on Monday mornings with the students below the minimum */
+                            weeklyStaffSummary: boolean;
                         };
                     };
                 };
@@ -6396,6 +6434,919 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/corrections/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Requests you can answer: for classes you teach, your department (HOD), or all (admin) */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                    status?: "pending" | "approved" | "rejected" | "withdrawn";
+                    sessionId?: string;
+                    /** @description Student name, username, roll no. or subject code */
+                    q?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                status: "pending" | "approved" | "rejected" | "withdrawn";
+                                /** @enum {string} */
+                                requestedStatus: "present" | "excused";
+                                /** @enum {string} */
+                                previousStatus: "present" | "absent" | "excused";
+                                /**
+                                 * @description The student's mark now
+                                 * @enum {string}
+                                 */
+                                currentStatus: "present" | "absent" | "excused";
+                                reason: string;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                reviewedAt: string | null;
+                                reviewNote: string | null;
+                                reviewer: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    fullName: string;
+                                } | null;
+                                student: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    username: string;
+                                    fullName: string;
+                                    rollNo: string | null;
+                                    unitPath: string[];
+                                };
+                                session: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: date-time */
+                                    startedAt: string;
+                                    kind: string;
+                                    topic: string | null;
+                                    /** @enum {string} */
+                                    status: "open" | "closed" | "cancelled";
+                                    subject: {
+                                        code: string;
+                                        name: string;
+                                    };
+                                    /** @description Who started the session */
+                                    teacher: string;
+                                };
+                            }[];
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Ask for your mark in a finished class to be changed (within the days your institute allows) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        sessionId: string;
+                        /**
+                         * @description present: "I was there"; excused: a valid reason to be away
+                         * @enum {string}
+                         */
+                        requestedStatus: "present" | "excused";
+                        /** @description What happened, for your teacher */
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            status: "pending" | "approved" | "rejected" | "withdrawn";
+                            /** @enum {string} */
+                            requestedStatus: "present" | "excused";
+                            reason: string;
+                            /** @description The teacher's reply */
+                            reviewNote: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            reviewedAt: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/corrections/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back your request before it is answered */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            status: "pending" | "approved" | "rejected" | "withdrawn";
+                            /** @enum {string} */
+                            requestedStatus: "present" | "excused";
+                            reason: string;
+                            /** @description The teacher's reply */
+                            reviewNote: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            reviewedAt: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/corrections/pending-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many requests are waiting for you */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/corrections/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the student's mark to what they asked for; they are notified */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Optional message to the student */
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            status: "pending" | "approved" | "rejected" | "withdrawn";
+                            /** @enum {string} */
+                            requestedStatus: "present" | "excused";
+                            /** @enum {string} */
+                            previousStatus: "present" | "absent" | "excused";
+                            /**
+                             * @description The student's mark now
+                             * @enum {string}
+                             */
+                            currentStatus: "present" | "absent" | "excused";
+                            reason: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            reviewedAt: string | null;
+                            reviewNote: string | null;
+                            reviewer: {
+                                /** Format: uuid */
+                                id: string;
+                                fullName: string;
+                            } | null;
+                            student: {
+                                /** Format: uuid */
+                                id: string;
+                                username: string;
+                                fullName: string;
+                                rollNo: string | null;
+                                unitPath: string[];
+                            };
+                            session: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: date-time */
+                                startedAt: string;
+                                kind: string;
+                                topic: string | null;
+                                /** @enum {string} */
+                                status: "open" | "closed" | "cancelled";
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                /** @description Who started the session */
+                                teacher: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/corrections/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep the mark as it is; the note tells the student why */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description e.g. "You left before the QR code was shown" */
+                        note: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            status: "pending" | "approved" | "rejected" | "withdrawn";
+                            /** @enum {string} */
+                            requestedStatus: "present" | "excused";
+                            /** @enum {string} */
+                            previousStatus: "present" | "absent" | "excused";
+                            /**
+                             * @description The student's mark now
+                             * @enum {string}
+                             */
+                            currentStatus: "present" | "absent" | "excused";
+                            reason: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            reviewedAt: string | null;
+                            reviewNote: string | null;
+                            reviewer: {
+                                /** Format: uuid */
+                                id: string;
+                                fullName: string;
+                            } | null;
+                            student: {
+                                /** Format: uuid */
+                                id: string;
+                                username: string;
+                                fullName: string;
+                                rollNo: string | null;
+                                unitPath: string[];
+                            };
+                            session: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: date-time */
+                                startedAt: string;
+                                kind: string;
+                                topic: string | null;
+                                /** @enum {string} */
+                                status: "open" | "closed" | "cancelled";
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                /** @description Who started the session */
+                                teacher: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your notifications, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    /** @description Only older than this (the createdAt of the last one you have) */
+                    before?: string;
+                    unread?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @description attendance.changed, correction.approved, correction.rejected, attendance.low or summary.weekly */
+                                kind: string;
+                                title: string;
+                                /** @description Plain text; blank lines separate paragraphs, "• " lines are list items */
+                                body: string;
+                                data: {
+                                    /** Format: uuid */
+                                    sessionId?: string;
+                                    /** Format: uuid */
+                                    correctionId?: string;
+                                    /** Format: uuid */
+                                    termId?: string;
+                                };
+                                read: boolean;
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                            unread: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many you haven’t read */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark notifications read (all of them when ids is left out) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        ids?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            unread: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/push-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive push notifications on this phone (the app calls this after signing in) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The phone's push registration (Firebase Cloud Messaging token on Android) */
+                        token: string;
+                        /** @enum {string} */
+                        platform: "android" | "ios";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": null;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/push-tokens/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop push notifications to this phone (the app calls this when signing out) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The phone's push registration (Firebase Cloud Messaging token on Android) */
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": null;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which delivery channels this server has set up */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            email: boolean;
+                            push: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activity log, newest first: admins see their institute, the platform owner every institute */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                    /** @description changes: All changes; attendance: Attendance; people: Students & staff; phones: Phones; academic: Classes & subjects; settings: Settings; security: Sign-ins & passwords */
+                    category?: "changes" | "attendance" | "people" | "phones" | "academic" | "settings" | "security";
+                    /** @description Only what this person did */
+                    actorId?: string;
+                    entityType?: string;
+                    entityId?: string;
+                    from?: string;
+                    to?: string;
+                    /** @description Platform owner only */
+                    instituteId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                id: number;
+                                /** Format: date-time */
+                                createdAt: string;
+                                action: string;
+                                /** @description What happened, in words */
+                                summary: string;
+                                actor: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    fullName: string;
+                                    username: string;
+                                    role: string;
+                                } | null;
+                                /** @description Platform owner only */
+                                institute: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                } | null;
+                                entity: {
+                                    type: string;
+                                    id: string;
+                                    label: string | null;
+                                } | null;
+                                ip: string | null;
+                                data: {
+                                    [key: string]: unknown;
+                                } | null;
+                            }[];
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                        };
+                    };
                 };
             };
         };

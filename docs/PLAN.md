@@ -156,8 +156,9 @@ page shows a **live headcount**, so a mismatch with the heads in the room is eas
   therefore takes effect immediately.
 - Login is rate-limited.
 - Every query is scoped to the caller's institute (tenant isolation), and tests cover this.
-- An audit log records logins, user changes, structure changes, manual attendance edits and
-  device changes.
+- An audit log records logins, user changes, structure changes, manual attendance edits,
+  correction requests and device changes. Admins read it on the *Activity* page (in plain
+  sentences, with names instead of ids); nobody can edit or delete entries.
 
 ## 4. Configurable academic structure (per institute)
 
@@ -236,7 +237,44 @@ class takes milliseconds and happens in the background within 15 seconds, or bef
 report is read if it hasn't yet, so reports always match the records. (Reading the records
 directly took 14.6 s for the same dashboard.)
 
-## 6. Tech stack (free until the first paying client)
+## 6. Corrections and notifications
+
+**Correction requests.** A student who was marked wrongly asks in the app (or on the web
+profile): "I was there" (→ present) or "I had a valid reason" (→ excused), with what
+happened.
+- Only for a finished, not cancelled class, within the institute's window (7 days by
+  default; 0 turns requests off), and only when the mark would go up.
+- One request per class at a time. A request that was answered can't be asked again (the
+  student speaks to the teacher); a withdrawn one can.
+- The class's teachers, the HOD of the students' department and admins answer on the
+  *Corrections* page (a badge counts what's waiting) or on the session's page. Approving
+  changes the mark like a mark by hand; turning down needs a reply to the student. If a
+  teacher marks the student by hand to what they asked, the request counts as approved;
+  cancelling the class closes it.
+- Every request, answer and withdrawal is in the activity log, and approved marks say
+  "Correction request: …" wherever marks by hand show their reason.
+
+**Notifications.** Every message goes to the user's list (the bell on the web, the
+bell in the app), and also:
+
+| Message | To | Phone | Email |
+|---|---|---|---|
+| A teacher changed your mark by hand | the student | ✓ | |
+| Your correction was approved / turned down | the student | ✓ | |
+| You're below the minimum (which subjects, and how many classes it takes to recover) | the student, at most weekly, from 5 pm, after 5 classes | ✓ | ✓ |
+| Students below the minimum in what you see | teachers, HODs, admins, Monday from 8 am | | ✓ |
+
+- Institutes switch the reminder and the summary on or off (both on by default).
+- Sending is reliable: messages are saved with the change that caused them, then a
+  background sender delivers them, retrying failures (1 min, 5 min, 30 min, 2 h), and
+  several servers never send the same message twice.
+- Email goes through Brevo (free: 300 a day; the server holds the rest until the next day,
+  and drops them after 3 days). Phone notifications go through Firebase Cloud Messaging
+  (free). Both are optional: without them, messages only appear in the list.
+- On the free hosting plan the server sleeps when idle, so a reminder due at 5 pm goes out
+  the next time the server is awake.
+
+## 7. Tech stack (free until the first paying client)
 
 | Part | Choice | Free hosting option |
 |---|---|---|
@@ -244,7 +282,7 @@ directly took 14.6 s for the same dashboard.)
 | Database | PostgreSQL 17 | Neon free plan (direct connection; see docs/DEPLOY.md) |
 | Web | React + Vite, Mantine UI, TanStack Query, React Router, typed API client generated from OpenAPI | Cloudflare Pages / Vercel |
 | Mobile | Expo SDK 58 (React Native), Expo Router, `expo-camera`, a small native module for Keystore keys (`apps/mobile/modules/device-key`) | Built locally (`npm run build:android`); EAS Build later |
-| Email / push | Brevo or Resend free tier / Expo push | free |
+| Email / push | Brevo (email API) / Firebase Cloud Messaging (Android push, sent directly from the server) | Brevo free plan (300 emails a day) / free |
 | API docs | OpenAPI generated from the Zod schemas, at `/docs` | — |
 
 **Costs we cannot avoid:**
@@ -256,7 +294,7 @@ directly took 14.6 s for the same dashboard.)
 
 Everything else stays on free tiers until a client signs.
 
-## 7. Roadmap: features, each one a review checkpoint
+## 8. Roadmap: features, each one a review checkpoint
 
 | # | Feature | Contents |
 |---|---|---|
@@ -266,7 +304,7 @@ Everything else stays on free tiers until a client signs.
 | 4 ✅ | Web app I | Login, admin screens for structure, users and imports, faculty "start session" and projector QR page with live count |
 | 5 ✅ | Mobile app + device binding | Expo app (Android): login, phone linking with hardware key attestation, QR scanner, my attendance; phone change requests and approvals (web "Phones" page) |
 | 6 ✅ | Reports & dashboards | Reports page (trend, by class, by subject, weekday × hour), defaulter list with a per-institute minimum, student drill-down, class register, Excel/PDF downloads, running totals for speed at 10k students |
-| 7 | Corrections & notifications | Attendance correction requests and approvals, audit-log viewer, email and push alerts (e.g. low attendance) |
+| 7 ✅ | Corrections & notifications | Correction requests from the app and the web, answered by teachers/HODs/admins; notification list on the web and in the app; phone (Firebase) and email (Brevo) alerts: marks changed by hand, answers, weekly low-attendance reminders, Monday staff summary; activity-log page |
 | 8 | Integration API | Per-institute API keys, webhooks (e.g. `attendance.recorded`), published OpenAPI docs |
 | 9 | Deploy & harden | Free-tier cloud deploy, CI, backups, load test (10k students / 30 parallel classes), monitoring |
 

@@ -22,6 +22,8 @@ import {
   IconChartBar,
   IconDeviceMobile,
   IconFileImport,
+  IconHistory,
+  IconMessageCheck,
   IconHierarchy2,
   IconHome,
   IconId,
@@ -41,7 +43,9 @@ import type { Role } from '../api/types';
 import { useAuth, useMe } from '../auth/AuthContext';
 import { ROLE_LABELS } from '../lib/format';
 import { usePendingPhoneCount } from '../pages/admin/PhonesPage';
+import { usePendingCorrectionCount } from './corrections';
 import { Logo } from './Logo';
+import { NotificationBell } from './NotificationBell';
 
 type NavItem = { to: string; label: string; icon: Icon; roles: Role[] };
 
@@ -50,6 +54,7 @@ const NAV: NavItem[] = [
   { to: '/platform/institutes', label: 'Institutes', icon: IconBuildingCommunity, roles: ['platform_admin'] },
   { to: '/classes', label: 'My classes', icon: IconChalkboard, roles: ['admin', 'hod', 'faculty'] },
   { to: '/sessions', label: 'Sessions', icon: IconCalendarEvent, roles: ['admin', 'hod', 'faculty'] },
+  { to: '/corrections', label: 'Corrections', icon: IconMessageCheck, roles: ['admin', 'hod', 'faculty'] },
   { to: '/reports', label: 'Reports', icon: IconChartBar, roles: ['admin', 'hod', 'faculty'] },
   { to: '/students', label: 'Students', icon: IconSchool, roles: ['admin', 'hod'] },
   { to: '/phones', label: 'Phones', icon: IconDeviceMobile, roles: ['admin', 'hod'] },
@@ -59,6 +64,7 @@ const NAV: NavItem[] = [
   { to: '/staff', label: 'Staff', icon: IconId, roles: ['admin'] },
   { to: '/structure', label: 'Structure', icon: IconHierarchy2, roles: ['admin'] },
   { to: '/import', label: 'Import', icon: IconFileImport, roles: ['admin'] },
+  { to: '/activity', label: 'Activity', icon: IconHistory, roles: ['admin', 'platform_admin'] },
   { to: '/settings', label: 'Settings', icon: IconSettings, roles: ['admin'] },
   { to: '/profile', label: 'My profile', icon: IconUser, roles: ['student'] },
 ];
@@ -72,6 +78,8 @@ export function AppLayout() {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const items = NAV.filter((n) => n.roles.includes(me.user.role));
   const pendingPhones = usePendingPhoneCount(me.user.role === 'admin' || me.user.role === 'hod');
+  const pendingCorrections = usePendingCorrectionCount(['admin', 'hod', 'faculty'].includes(me.user.role));
+  const badges: Record<string, number | undefined> = { '/phones': pendingPhones.data, '/corrections': pendingCorrections.data };
 
   return (
     <AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
@@ -87,6 +95,7 @@ export function AppLayout() {
             )}
           </Group>
           <Group gap="xs" wrap="nowrap">
+            {me.user.role !== 'platform_admin' && <NotificationBell role={me.user.role} />}
             <Tooltip label={colorScheme === 'dark' ? 'Light mode' : 'Dark mode'}>
               <ActionIcon
                 variant="subtle"
@@ -138,9 +147,9 @@ export function AppLayout() {
               label={item.label}
               leftSection={<item.icon size={18} stroke={1.6} />}
               rightSection={
-                item.to === '/phones' && pendingPhones.data ? (
-                  <Badge size="sm" circle color="orange" aria-label={`${pendingPhones.data} waiting`}>
-                    {pendingPhones.data}
+                badges[item.to] ? (
+                  <Badge size="sm" circle color="orange" aria-label={`${badges[item.to]} waiting`}>
+                    {badges[item.to]}
                   </Badge>
                 ) : undefined
               }

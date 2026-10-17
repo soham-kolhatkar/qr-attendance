@@ -11,6 +11,9 @@ export type AttendanceSettings = {
   defaultScanMinutes: number;
   requireRegisteredPhone: boolean;
   minimumPercent: number;
+  correctionWindowDays: number;
+  lowAttendanceAlerts: boolean;
+  weeklyStaffSummary: boolean;
 };
 
 export const ATTENDANCE_DEFAULTS: AttendanceSettings = {
@@ -19,6 +22,9 @@ export const ATTENDANCE_DEFAULTS: AttendanceSettings = {
   defaultScanMinutes: 10,
   requireRegisteredPhone: true,
   minimumPercent: 75,
+  correctionWindowDays: 7,
+  lowAttendanceAlerts: true,
+  weeklyStaffSummary: true,
 };
 
 export async function getAttendanceSettings(db: DbOrTx, instituteId: string): Promise<AttendanceSettings> {

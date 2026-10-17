@@ -36,6 +36,12 @@ import {
 } from './modules/devices/attestation.js';
 import { deviceRoutes } from './modules/devices/routes.js';
 import { reportRoutes } from './modules/reports/routes.js';
+import { auditRoutes } from './modules/audit/routes.js';
+import { correctionRoutes } from './modules/corrections/routes.js';
+import type { Delivery } from './modules/notifications/delivery.js';
+import { brevoSender, logSender } from './modules/notifications/email.js';
+import { fcmSender } from './modules/notifications/push.js';
+import { notificationRoutes } from './modules/notifications/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -47,6 +53,8 @@ declare module 'fastify' {
     now(): Date;
     /** What a phone must prove to be linked to a student. */
     attestation: AndroidAttestationPolicy;
+    /** How notifications reach people by email and push (null channels aren't set up). */
+    delivery: Delivery;
   }
   interface FastifyContextConfig {
     /**
@@ -62,12 +70,15 @@ export async function buildApp({
   db,
   clock = Date.now,
   attestation,
+  delivery,
 }: {
   config: Config;
   db: Db;
   clock?: () => number;
   /** Overrides for tests (e.g. a test root certificate). */
   attestation?: Partial<AndroidAttestationPolicy>;
+  /** Overrides for tests (fake email and push). */
+  delivery?: Partial<Delivery>;
 }) {
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
@@ -99,6 +110,18 @@ export async function buildApp({
     signingCertDigests: config.ANDROID_SIGNING_CERT_SHA256,
     revokedSerials: config.ATTESTATION_REVOCATION_CHECK ? googleRevocationList(app.log) : async () => new Set<string>(),
     ...attestation,
+  });
+  app.decorate('delivery', {
+    email:
+      config.EMAIL_PROVIDER === 'brevo'
+        ? brevoSender(config.BREVO_API_KEY!, config.EMAIL_FROM!)
+        : config.EMAIL_PROVIDER === 'log'
+          ? logSender(app.log)
+          : null,
+    push: config.FCM_SERVICE_ACCOUNT ? fcmSender(config.FCM_SERVICE_ACCOUNT) : null,
+    emailDailyLimit: config.EMAIL_DAILY_LIMIT,
+    publicUrl: config.PUBLIC_URL,
+    ...delivery,
   });
   if (config.NODE_ENV === 'production' && config.ANDROID_SIGNING_CERT_SHA256.length === 0) {
     app.log.warn('ANDROID_SIGNING_CERT_SHA256 is not set: a modified, re-signed copy of the student app could link phones');
@@ -183,6 +206,9 @@ export async function buildApp({
   await app.register(settingsRoutes, { prefix: '/v1/settings' });
   await app.register(deviceRoutes, { prefix: '/v1/devices' });
   await app.register(reportRoutes, { prefix: '/v1/reports' });
+  await app.register(correctionRoutes, { prefix: '/v1/corrections' });
+  await app.register(notificationRoutes, { prefix: '/v1/notifications' });
+  await app.register(auditRoutes, { prefix: '/v1/audit' });
 
   return app;
 }

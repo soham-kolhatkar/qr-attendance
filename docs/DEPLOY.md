@@ -79,6 +79,42 @@ different key — for example by Google Play — add that key's fingerprint, com
 The app talks to this address by default. Students sign in with the same institute code,
 username and password as on the web.
 
+## Email and phone notifications (optional)
+
+Without these, every notification still appears in the notification list (the bell) on
+the web and in the app. Each one is a free account and a few settings; do them in any order.
+
+**Email (Brevo, free: 300 emails a day).**
+1. Create an account at brevo.com.
+2. *Senders, domains & dedicated IPs → Senders → Add a sender*: the address emails come
+   from, e.g. one of your own. Brevo emails it a confirmation link; click it.
+3. *SMTP & API → API keys → Generate a new API key*. Copy it (it is shown once).
+4. Render → service → *Environment*, add:
+   - `EMAIL_PROVIDER` = `brevo`
+   - `BREVO_API_KEY` = the key
+   - `EMAIL_FROM` = `QR Attendance <the sender address>`
+
+   then *Save, rebuild and deploy*.
+
+Emails from a free address (Gmail and the like) sent through Brevo may land in spam. A
+real institute should send from its own domain, set up under *Senders, domains* in Brevo.
+Emails over the daily limit wait for the next day (`EMAIL_DAILY_LIMIT`, default 300).
+
+**Phone notifications (Firebase Cloud Messaging, free).**
+1. At console.firebase.google.com, *Create a project* (Google Analytics isn't needed).
+2. *Add app → Android*, package name `com.qrattendance.student`. Download
+   `google-services.json` and save it as `~/.qr-attendance/google-services.json` on the
+   computer that builds the app (next to the signing key; keep it out of the repository).
+3. Rebuild the app (`npm run build:android`; it says "push notifications: on") and
+   install it on the phones.
+4. *Project settings → Service accounts → Generate new private key* downloads a JSON
+   file. It is a secret: in Render → service → *Environment*, add `FCM_SERVICE_ACCOUNT`
+   and paste the whole file's contents as the value. *Save, rebuild and deploy*.
+
+The admin *Settings* page says which of the two are set up. Reminders go out from 5 pm
+(India time) and the staff summary on Monday mornings; the free plan sleeps when idle, so
+they go out the next time the server is awake.
+
 ## Checking a deployment
 
 A smoke test runs the core path against the live site with a real browser:
@@ -125,6 +161,9 @@ Neon to a paid plan (longer recovery history, more compute), and turn the demo o
 | `Live updates need a direct database connection` | The Neon URL is the pooled one; use the direct one (no `-pooler`) |
 | The laptop check says `could not reach the database (ETIMEDOUT)` | Your network blocks database port 5432 (common on office networks). Render is not affected; to check from the laptop, use another network such as a phone hotspot |
 | Page says the service is waking up | Normal after 15 idle minutes; wait about a minute |
+| `Invalid environment configuration` mentioning `FCM_SERVICE_ACCOUNT` | Paste the Firebase key file's whole contents, starting with `{` |
+| `notification delivery problem` … `Brevo 401` | `BREVO_API_KEY` is wrong or was deleted in Brevo |
+| `notification delivery problem` … `Brevo 400` … sender | `EMAIL_FROM` isn't a sender verified in Brevo |
 
 Changing `SEED_PLATFORM_ADMIN_PASSWORD` later does **not** change an existing owner's
 password. Sign in and use *Change password* instead.

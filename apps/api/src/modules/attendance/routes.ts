@@ -26,6 +26,7 @@ import {
   startSession,
 } from './sessions.js';
 import { getAttendanceSettings, updateAttendanceSettings } from './settings.js';
+import { myCorrectionSchema } from '../corrections/routes.js';
 import { getMyAttendance } from './student.js';
 
 const security = [{ bearerAuth: [] }];
@@ -428,6 +429,7 @@ export const scanRoutes: FastifyPluginAsyncZod = async (app) => {
           200: z.object({
             term: z.object({ id: z.uuid(), name: z.string() }).nullable(),
             minimumPercent: z.number().int().describe("The institute's minimum attendance percentage"),
+            correctionWindowDays: z.number().int().describe('Days after a class within which you can ask for a correction; 0 = not in the app'),
             terms: z.array(z.object({ id: z.uuid(), name: z.string() })),
             overall: z.object(tallySchema),
             subjects: z.array(z.object({ offeringId: z.uuid(), subject: subjectRefSchema, ...tallySchema })),
@@ -441,6 +443,10 @@ export const scanRoutes: FastifyPluginAsyncZod = async (app) => {
                 status: z.enum(ATTENDANCE_STATUSES),
                 method: z.enum(['qr', 'manual']).nullable(),
                 open: z.boolean().describe('Still taking attendance'),
+                correction: myCorrectionSchema.nullable().describe('Your latest correction request for this class'),
+                canRequest: z
+                  .array(z.enum(['present', 'excused']))
+                  .describe('What you can ask to be marked instead, now; empty when you can’t ask'),
               }),
             ),
           }),
@@ -469,6 +475,18 @@ const attendanceSettingsSchema = z.object({
     .min(1)
     .max(100)
     .describe('Students below this attendance percentage are listed as defaulters'),
+  correctionWindowDays: z
+    .number()
+    .int()
+    .min(0)
+    .max(60)
+    .describe('How many days after a class students can ask in the app for their mark to be corrected; 0 turns requests off'),
+  lowAttendanceAlerts: z
+    .boolean()
+    .describe('Remind students below the minimum on their phone and by email, at most once a week (after 5 classes)'),
+  weeklyStaffSummary: z
+    .boolean()
+    .describe('Email teachers, HODs and admins on Monday mornings with the students below the minimum'),
 });
 
 export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {
