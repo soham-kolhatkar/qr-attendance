@@ -1,0 +1,50 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# One web service that serves both the API (/v1, /docs) and the web app (everything
+# else) from the same address, on Render's free plan in Singapore (closest region to
+# India). The database is Neon (free, doesn't expire). See docs/DEPLOY.md.
+services:
+  - type: web
+    name: qr-attendance
+    runtime: node
+    plan: free
+    region: singapore
+    # devDependencies (TypeScript, Vite) are needed to build even though NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build -w apps/api && npm run build -w apps/web
+    # Applies database migrations and ensures the platform owner exists, then starts.
+    startCommand: npm run start:prod -w apps/api
+    healthCheckPath: /health
+    buildFilter:
+      ignoredPaths:
+        - docs/**
+        - "**/*.md"
+        - apps/web/e2e/**
+        - scripts/**
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: SERVE_WEB
+        value: "true"
+      - key: LOG_LEVEL
+        value: info
+      # Neon's *direct* connection string (host without "-pooler"), including
+      # ?sslmode=require. Render asks for it when you create the Blueprint; it is a
+      # secret and never goes in the repository.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # Your sign-in as platform owner (no institute code). Render asks for the password
+      # when you create the Blueprint; use 12+ characters.
+      - key: SEED_PLATFORM_ADMIN_USERNAME
+        value: owner
+      - key: SEED_PLATFORM_ADMIN_PASSWORD
+        sync: false
+      # Test deployment only: adds the DEMO institute (public demo passwords).
+      # Set to "false" before any real institute uses this deployment.
+      - key: SEED_DEMO
+        value: "true"

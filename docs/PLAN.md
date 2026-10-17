@@ -175,8 +175,8 @@ example a lab for batch A2 only. All of this can be bulk-imported from Excel/CSV
 
 | Part | Choice | Free hosting option |
 |---|---|---|
-| API | Node 24, TypeScript, Fastify, Zod, Drizzle ORM | Docker image → Google Cloud Run free tier / Oracle Always-Free VM (decided at deploy time) |
-| Database | PostgreSQL 17 | Neon or Supabase free tier |
+| API + web app | Node 24, TypeScript, Fastify, Zod, Drizzle ORM; the API also serves the built web app (one address, no CORS) | Render free web service (test environment, `render.yaml`) |
+| Database | PostgreSQL 17 | Neon free plan (direct connection; see docs/DEPLOY.md) |
 | Web | React + Vite, Mantine UI, TanStack Query, React Router, typed API client generated from OpenAPI | Cloudflare Pages / Vercel |
 | Mobile | Expo (React Native) dev builds, `expo-camera`, `@expo/app-integrity` | EAS Build free tier |
 | Email / push | Brevo or Resend free tier / Expo push | free |

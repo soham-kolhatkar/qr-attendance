@@ -1,7 +1,11 @@
 /**
- * Development seed: creates the platform admin (from env) and, outside production, a
- * DEMO institute with a small structure, staff, students and offerings so every API
- * can be tried immediately. Safe to run repeatedly; it fills in whatever is missing.
+ * Creates the platform admin (from env) and, when demo data is wanted, a DEMO institute
+ * with a small structure, staff, students and offerings so everything can be tried at
+ * once. Runs on every server start in deployments; safe to repeat, it only fills in
+ * what is missing.
+ *
+ * Demo data: on by default in development, opt-in elsewhere with SEED_DEMO=true (e.g. a
+ * test deployment). Its passwords are public, so never enable it for a real institute.
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import { hashPassword } from '../lib/password.js';
@@ -21,6 +25,10 @@ const ownerPassword = process.env.SEED_PLATFORM_ADMIN_PASSWORD;
 if (!url || !ownerUsername || !ownerPassword) {
   throw new Error('Set DATABASE_URL, SEED_PLATFORM_ADMIN_USERNAME and SEED_PLATFORM_ADMIN_PASSWORD');
 }
+if (process.env.NODE_ENV === 'production' && ownerPassword.length < 12) {
+  throw new Error('SEED_PLATFORM_ADMIN_PASSWORD must be at least 12 characters in production');
+}
+const seedDemoData = process.env.SEED_DEMO ? process.env.SEED_DEMO === 'true' : process.env.NODE_ENV !== 'production';
 
 const DEMO_PASSWORD = 'demo-pass-123';
 
@@ -172,7 +180,7 @@ async function seedDemo(db: Db, ownerId: string) {
 const { db, pool } = createDb(url);
 try {
   const owner = await ensureOwner(db);
-  if (process.env.NODE_ENV !== 'production') await seedDemo(db, owner.id);
+  if (seedDemoData) await seedDemo(db, owner.id);
 } finally {
   await pool.end();
 }

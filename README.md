@@ -14,6 +14,11 @@ apps/mobile   Student app, Expo React Native                (Feature 5)
 docs/         Plan and design notes
 ```
 
+## Online test environment
+
+The product can run on Render's free plan at one HTTPS address (web app + API). See
+[docs/DEPLOY.md](docs/DEPLOY.md) for the setup steps and the free plan's limits.
+
 ## Running locally
 
 Requirements: Node 24+, Docker. Packages always come from the public npm registry (see
