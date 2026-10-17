@@ -427,6 +427,7 @@ export const scanRoutes: FastifyPluginAsyncZod = async (app) => {
         response: {
           200: z.object({
             term: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+            minimumPercent: z.number().int().describe("The institute's minimum attendance percentage"),
             terms: z.array(z.object({ id: z.uuid(), name: z.string() })),
             overall: z.object(tallySchema),
             subjects: z.array(z.object({ offeringId: z.uuid(), subject: subjectRefSchema, ...tallySchema })),
@@ -462,6 +463,12 @@ const attendanceSettingsSchema = z.object({
   requireRegisteredPhone: z
     .boolean()
     .describe('Scans must come from the student’s linked phone. Turn off only while students can’t use the app.'),
+  minimumPercent: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .describe('Students below this attendance percentage are listed as defaulters'),
 });
 
 export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {

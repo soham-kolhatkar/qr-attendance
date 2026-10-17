@@ -25,6 +25,7 @@ import {
   withTemporaryPasswords,
 } from './common.js';
 import type { Sheet } from './sheet.js';
+import { markStudentsStale } from '../reports/tallies.js';
 
 export const STUDENT_FIELDS: FieldSpec[] = [
   {
@@ -233,6 +234,11 @@ export async function importStudents(
             .where(and(eq(groupMembers.studentId, u.userId), inArray(groupMembers.groupId, u.dropGroupIds)));
         }
       }
+      // Report trends are grouped by class.
+      await markStudentsStale(
+        tx,
+        updates.filter((u) => u.profile).map((u) => u.userId),
+      );
 
       await writeAudit(tx, {
         instituteId: auth.instituteId,

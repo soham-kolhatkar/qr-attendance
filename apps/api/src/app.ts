@@ -35,6 +35,7 @@ import {
   googleRevocationList,
 } from './modules/devices/attestation.js';
 import { deviceRoutes } from './modules/devices/routes.js';
+import { reportRoutes } from './modules/reports/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -181,6 +182,7 @@ export async function buildApp({
   await app.register(scanRoutes, { prefix: '/v1/attendance' });
   await app.register(settingsRoutes, { prefix: '/v1/settings' });
   await app.register(deviceRoutes, { prefix: '/v1/devices' });
+  await app.register(reportRoutes, { prefix: '/v1/reports' });
 
   return app;
 }

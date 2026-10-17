@@ -29,6 +29,13 @@
       "when": 1792244120613,
       "tag": "0003_linked_phones",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792263147626,
+      "tag": "0004_report_tallies",
+      "breakpoints": true
     }
   ]
 }

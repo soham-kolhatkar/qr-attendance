@@ -16,6 +16,8 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { InstitutesPage } from './pages/platform/InstitutesPage';
+import { RegisterPage } from './pages/reports/RegisterPage';
+import { ReportsPage } from './pages/reports/ReportsPage';
 import { ProfilePage } from './pages/student/ProfilePage';
 import { MyClassesPage } from './pages/teach/MyClassesPage';
 import { ProjectorPage } from './pages/teach/ProjectorPage';
@@ -66,6 +68,8 @@ export const router = createBrowserRouter([
       { path: 'classes', element: <RequireAuth roles={STAFF}><MyClassesPage /></RequireAuth> },
       { path: 'sessions', element: <RequireAuth roles={STAFF}><SessionsPage /></RequireAuth> },
       { path: 'sessions/:id', element: <RequireAuth roles={STAFF}><SessionPage /></RequireAuth> },
+      { path: 'reports', element: <RequireAuth roles={STAFF}><ReportsPage /></RequireAuth> },
+      { path: 'reports/offerings/:id', element: <RequireAuth roles={STAFF}><RegisterPage /></RequireAuth> },
       { path: 'platform/institutes', element: <RequireAuth roles={['platform_admin']}><InstitutesPage /></RequireAuth> },
       { path: 'profile', element: <ProfilePage /> },
       { path: '*', element: <NotFoundPage /> },

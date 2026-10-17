@@ -23,6 +23,7 @@ import {
   visibilityCondition,
 } from '../offerings/service.js';
 import { loadUnitIndex } from '../structure/service.js';
+import { markOfferingsStale } from '../reports/tallies.js';
 import type { LiveHub, SessionCounts } from './live.js';
 import { generateQrSecret, qrPayload, stepAt, stepEndsAt } from './qr.js';
 import { getAttendanceSettings } from './settings.js';
@@ -443,6 +444,7 @@ export async function closeSession(
       .set({ status: 'closed', closedAt, closesAt: closedAt })
       .where(eq(attendanceSessions.id, sessionId))
       .returning();
+    await markOfferingsStale(tx, [s.offeringId]);
     await writeAudit(tx, {
       instituteId: auth.instituteId,
       actorUserId: auth.userId,
@@ -477,6 +479,7 @@ export async function extendSession(
         .set({ status: 'open', closedAt: null, closesAt: new Date(base.getTime() + minutes * 60_000) })
         .where(eq(attendanceSessions.id, sessionId))
         .returning();
+      await markOfferingsStale(tx, [s.offeringId]);
       await writeAudit(tx, {
         instituteId: auth.instituteId,
         actorUserId: auth.userId,
@@ -516,6 +519,7 @@ export async function cancelSession(
       .set({ status: 'cancelled', cancelReason: reason, closedAt: s.closedAt ?? now })
       .where(eq(attendanceSessions.id, sessionId))
       .returning();
+    await markOfferingsStale(tx, [s.offeringId]);
     await writeAudit(tx, {
       instituteId: auth.instituteId,
       actorUserId: auth.userId,
@@ -538,6 +542,10 @@ export async function closeExpiredSessions(db: Db, hub: LiveHub, now: Date): Pro
       .set({ status: 'closed', closedAt: sql`${attendanceSessions.closesAt}` })
       .where(and(eq(attendanceSessions.status, 'open'), lte(attendanceSessions.closesAt, now)))
       .returning();
+    await markOfferingsStale(
+      tx,
+      closed.map((s) => s.offeringId),
+    );
     for (const s of closed) await publishSession(tx, hub, s, now);
     return closed.length;
   });
@@ -582,6 +590,7 @@ export async function markRecords(
       .update(attendanceRecords)
       .set({ status: input.status, method: 'manual', markedAt: now, markedBy: auth.userId, reason: input.reason, qrStep: null, ip: null })
       .where(and(eq(attendanceRecords.sessionId, sessionId), inArray(attendanceRecords.studentId, studentIds)));
+    await markOfferingsStale(tx, [s.offeringId]);
 
     await writeAudit(tx, {
       instituteId: auth.instituteId,

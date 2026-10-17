@@ -201,7 +201,42 @@ example a lab for batch A2 only. All of this can be bulk-imported from Excel/CSV
 - **Speed.** Measured on 10,000 students: preview 0.2 s, commit 7.6 s, re-import of the
   same file 0.3 s.
 
-## 5. Tech stack (free until the first paying client)
+## 5. Reports
+
+**How attendance is counted** (the same everywhere: dashboards, downloads, the student app):
+
+- A session counts once it has **finished**: closed by the teacher or by time. Cancelled
+  sessions never count; a re-opened session stops counting until it finishes again.
+- **Attendance % = present ÷ (sessions − excused).** An excused absence (e.g. a medical
+  certificate) counts neither for nor against the student.
+- A student below the institute's **minimum** (75% by default, set under Settings) is a
+  **defaulter**. Exactly at the minimum is not below it.
+
+**Who sees what:** admins the whole institute; a HOD their department's students plus the
+classes they teach; faculty the classes they teach; students only themselves.
+
+**What's there:**
+- **Reports page:** the term's attendance, defaulters, trend by day, by class, by subject,
+  and a weekday × hour heatmap. Filter by class, subject or batch; click a class or
+  subject to filter by it.
+- **Student list:** defaulters (lowest first) or everyone. Click a student for their
+  subjects and every session, including who marked it by hand and why.
+- **Class register:** students × sessions (P/A/E), for teachers from *My classes* and for
+  admins from *Offerings*.
+- **Downloads:** Excel (with a column per subject, or the full register) and PDF for
+  printing. Each file states the term, filters, minimum and how it was counted.
+
+**Speed at 10,000 students** (a term of 48,600 sessions and 2.7 million attendance records,
+measured on a laptop): whole-institute dashboard 0.4 s, one department 0.13 s, one class or
+one teacher 0.02 s, defaulter list 0.14 s, class register 0.02 s. The dashboards read
+**running totals** (per student per class, and per session) instead of every record. The
+totals are recounted per class when something changes what counts: a session finishes, is
+re-opened or cancelled, a mark is changed by hand, or a student moves class. Recounting a
+class takes milliseconds and happens in the background within 15 seconds, or before a
+report is read if it hasn't yet, so reports always match the records. (Reading the records
+directly took 14.6 s for the same dashboard.)
+
+## 6. Tech stack (free until the first paying client)
 
 | Part | Choice | Free hosting option |
 |---|---|---|
@@ -221,7 +256,7 @@ example a lab for batch A2 only. All of this can be bulk-imported from Excel/CSV
 
 Everything else stays on free tiers until a client signs.
 
-## 6. Roadmap: features, each one a review checkpoint
+## 7. Roadmap: features, each one a review checkpoint
 
 | # | Feature | Contents |
 |---|---|---|
@@ -230,7 +265,7 @@ Everything else stays on free tiers until a client signs.
 | 3 ✅ | Attendance engine | Sessions, rotating-QR engine, scan verification, manual marking with reasons, auto-close and absentees, live headcount (SSE) |
 | 4 ✅ | Web app I | Login, admin screens for structure, users and imports, faculty "start session" and projector QR page with live count |
 | 5 ✅ | Mobile app + device binding | Expo app (Android): login, phone linking with hardware key attestation, QR scanner, my attendance; phone change requests and approvals (web "Phones" page) |
-| 6 | Reports & dashboards | Student, faculty, HOD and admin dashboards; defaulter list (< threshold); trends and heatmaps; Excel/PDF export |
+| 6 ✅ | Reports & dashboards | Reports page (trend, by class, by subject, weekday × hour), defaulter list with a per-institute minimum, student drill-down, class register, Excel/PDF downloads, running totals for speed at 10k students |
 | 7 | Corrections & notifications | Attendance correction requests and approvals, audit-log viewer, email and push alerts (e.g. low attendance) |
 | 8 | Integration API | Per-institute API keys, webhooks (e.g. `attendance.recorded`), published OpenAPI docs |
 | 9 | Deploy & harden | Free-tier cloud deploy, CI, backups, load test (10k students / 30 parallel classes), monitoring |

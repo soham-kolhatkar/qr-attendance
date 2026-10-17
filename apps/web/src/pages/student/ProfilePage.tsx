@@ -5,6 +5,7 @@ import { api, unwrap } from '../../api/client';
 import { useMe } from '../../auth/AuthContext';
 import { PageHeader } from '../../components/common';
 import { formatDate, ROLE_LABELS } from '../../lib/format';
+import { countsText, Percent, PercentBar } from '../../components/report';
 
 export function ProfilePage() {
   const me = useMe();
@@ -13,6 +14,7 @@ export function ProfilePage() {
       <PageHeader title="My profile" />
       <Stack maw={640}>
         {me.user.role === 'student' && <MyPhone />}
+        {me.user.role === 'student' && <MyAttendance />}
         <Card withBorder padding="lg">
           <Table variant="vertical" withRowBorders={false} verticalSpacing={6}>
             <Table.Tbody>
@@ -94,5 +96,48 @@ function MyPhone() {
         )}
       </Stack>
     </Alert>
+  );
+}
+
+function MyAttendance() {
+  const mine = useQuery({ queryKey: ['attendance', 'mine'], queryFn: async () => unwrap(await api.GET('/v1/attendance/mine')) });
+  const m = mine.data;
+  if (!m?.term) return null;
+  return (
+    <Card withBorder padding="lg">
+      <Group justify="space-between" align="flex-start" mb="sm">
+        <div>
+          <Text fw={600}>My attendance</Text>
+          <Text size="xs" c="dimmed">
+            {m.term.name} · minimum {m.minimumPercent}%
+          </Text>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <Percent value={m.overall.percentage} minimum={m.minimumPercent} fz={26} fw={700} />
+          <Text size="xs" c="dimmed">
+            Present in {countsText(m.overall)}
+          </Text>
+        </div>
+      </Group>
+      <Table verticalSpacing={6}>
+        <Table.Tbody>
+          {m.subjects.map((s) => (
+            <Table.Tr key={s.offeringId}>
+              <Table.Td>
+                <Text size="sm" fw={500}>
+                  {s.subject.name}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {s.subject.code} · {s.present}/{s.total - s.excused}
+                </Text>
+              </Table.Td>
+              <Table.Td w={150}>
+                <PercentBar value={s.percentage} minimum={m.minimumPercent} />
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Card>
   );
 }

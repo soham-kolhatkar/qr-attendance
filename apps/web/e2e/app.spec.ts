@@ -70,7 +70,8 @@ test('admin screens', async ({ page }) => {
   await signIn(page, 'admin');
   await expect(page.getByText('Welcome, Demo Admin')).toBeVisible();
   await expect(page.getByText('Teachers & HODs')).toBeVisible();
-  await expect(page.getByText('Getting started')).toBeVisible();
+  // The demo comes with six weeks of past classes.
+  await expect(page.getByRole('link', { name: 'Open reports' })).toBeVisible();
   await shot(page, '02-admin-home');
 
   await page.getByRole('link', { name: 'Structure' }).click();
@@ -106,6 +107,7 @@ test('admin screens', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await expect(page.getByLabel('QR code changes every (seconds)')).toHaveValue('5');
   await expect(page.getByLabel('Students must scan with their linked phone')).toBeChecked();
+  await expect(page.getByLabel('Students below this are listed as defaulters')).toHaveValue('75%');
   await shot(page, '08-settings');
 });
 
@@ -248,6 +250,49 @@ test('teacher runs attendance; a student scans the projected code', async ({ pag
   await signOut(page);
 });
 
+test('reports: dashboard, defaulters, a student, downloads', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.getByRole('link', { name: 'Reports' }).click();
+  await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible();
+  await expect(page.getByText('Attendance by day')).toBeVisible();
+  await expect(page.getByText('By subject')).toBeVisible();
+  await expect(page.getByRole('cell', { name: /CS301 Data Structures/ })).toBeVisible();
+  await expect(page.getByText('By day and time')).toBeVisible();
+  // Meera (about 55%) and Kabir (about 70%) are below 75%.
+  const list = page.locator('.mantine-Card-root', { hasText: 'All students' });
+  await expect(list.getByRole('row', { name: /Meera Kulkarni/ })).toBeVisible();
+  await expect(list.getByRole('row', { name: /Kabir Joshi/ })).toBeVisible();
+  await expect(list.getByRole('row', { name: /Aarav Patil/ })).toHaveCount(0);
+  await shot(page, '22-reports');
+
+  await list.getByRole('row', { name: /Meera Kulkarni/ }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.getByText('Sessions', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Below the minimum')).toBeVisible();
+  await shot(page, '23-report-student');
+  await page.keyboard.press('Escape');
+
+  await list.getByRole('button', { name: 'Download' }).click();
+  const [excel] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Excel/ }).click()]);
+  expect(excel.suggestedFilename()).toMatch(/^defaulters-.*\.xlsx$/);
+
+  // Filter to one class by clicking it.
+  await page.getByRole('cell', { name: /Div A/ }).first().click();
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+});
+
+test('teacher opens the class register', async ({ page }) => {
+  await signIn(page, 'prof.sharma');
+  await page.locator('.mantine-Card-root', { hasText: 'CS301' }).getByRole('link', { name: 'Register' }).click();
+  await expect(page.getByRole('heading', { name: 'CS301 Data Structures' })).toBeVisible();
+  await expect(page.getByText('Class attendance')).toBeVisible();
+  await expect(page.getByRole('row', { name: /Meera Kulkarni/ })).toBeVisible();
+  await shot(page, '24-register');
+  await page.getByRole('button', { name: 'Download' }).click();
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /PDF/ }).click()]);
+  expect(pdf.suggestedFilename()).toMatch(/^register-cs301-.*\.pdf$/);
+});
+
 test('HOD sees their department', async ({ page }) => {
   await signIn(page, 'hod.comp');
   await expect(page).toHaveURL(/\/classes/);
@@ -263,6 +308,7 @@ test('student and platform owner', async ({ page }) => {
   await expect(page).toHaveURL(/\/profile/);
   await expect(page.getByText('Computer Engineering › SY › Div A')).toBeVisible();
   await expect(page.getByText('Sign in to the app on your phone to link it.')).toBeVisible();
+  await expect(page.getByText('My attendance')).toBeVisible();
   await shot(page, '18-student-profile');
   await signOut(page);
 

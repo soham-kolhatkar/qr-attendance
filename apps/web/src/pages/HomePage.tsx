@@ -5,6 +5,7 @@ import { Link, Navigate } from 'react-router';
 import { api, unwrap } from '../api/client';
 import { useMe } from '../auth/AuthContext';
 import { PageHeader, QueryState } from '../components/common';
+import { Percent } from '../components/report';
 
 export function HomePage() {
   const me = useMe();
@@ -86,6 +87,8 @@ function AdminHome() {
               <Stat label="Sessions running now" value={o.openSessions} highlight={o.openSessions > 0} />
             </SimpleGrid>
 
+            <TermAttendance />
+
             {done < steps.length && (
               <Card withBorder padding="lg">
                 <Group justify="space-between" mb="xs">
@@ -143,6 +146,45 @@ function Stat({ label, value, highlight }: { label: string; value: number; highl
             live
           </Badge>
         )}
+      </Group>
+    </Card>
+  );
+}
+
+/** This term at a glance, linking to the full reports. */
+function TermAttendance() {
+  const summary = useQuery({
+    queryKey: ['reports', 'summary', {}],
+    queryFn: async () => unwrap(await api.GET('/v1/reports/summary', { params: { query: {} } })),
+  });
+  const s = summary.data;
+  if (!s?.term || s.sessions === 0) return null;
+  return (
+    <Card withBorder padding="lg">
+      <Group justify="space-between" wrap="wrap">
+        <Group gap="xl" wrap="wrap">
+          <div>
+            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+              Attendance · {s.term.name}
+            </Text>
+            <Percent value={s.overall.percentage} minimum={s.minimumPercent} fz={30} fw={700} />
+          </div>
+          <div>
+            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+              Below {s.minimumPercent}%
+            </Text>
+            <Text fz={30} fw={700} c={s.students.below > 0 ? 'red' : undefined}>
+              {s.students.below.toLocaleString()}
+              <Text span size="sm" c="dimmed" fw={400}>
+                {' '}
+                of {s.students.total.toLocaleString()} students
+              </Text>
+            </Text>
+          </div>
+        </Group>
+        <Button component={Link} to="/reports" variant="light" rightSection={<IconChevronRight size={14} />}>
+          Open reports
+        </Button>
       </Group>
     </Card>
   );

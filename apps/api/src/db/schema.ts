@@ -54,6 +54,8 @@ export type InstituteSettings = {
     defaultScanMinutes?: number;
     /** Scans must come from the student's linked phone (signed by its hardware key). */
     requireRegisteredPhone?: boolean;
+    /** Students below this attendance percentage are listed as defaulters. */
+    minimumPercent?: number;
   };
 };
 
@@ -327,10 +329,15 @@ export const offerings = pgTable(
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'restrict' }),
+    /** Report totals (student_tallies, session_tallies) need recounting for this offering. */
+    talliesStale: boolean('tallies_stale').notNull().default(true),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('offerings_term_idx').on(t.instituteId, t.termId)],
+  (t) => [
+    index('offerings_term_idx').on(t.instituteId, t.termId),
+    index('offerings_tallies_stale_idx').on(t.instituteId).where(sql`${t.talliesStale}`),
+  ],
 );
 
 export const offeringFaculty = pgTable(
@@ -525,4 +532,60 @@ export const devices = pgTable(
     index('devices_institute_status_idx').on(t.instituteId, t.status, t.createdAt.desc()),
     index('devices_user_idx').on(t.userId),
   ],
+);
+
+// ---------------------------------------------------------------------------
+// Report totals (Feature 6)
+//
+// Running totals over finished sessions, so dashboards add up thousands of rows instead
+// of millions of attendance records. Recounted per offering whenever something changes
+// what counts (a session finishes, is re-opened or cancelled, a mark is changed by hand,
+// a student changes class): see modules/reports/tallies.ts.
+// ---------------------------------------------------------------------------
+
+const tallyCounts = () => ({
+  present: integer('present').notNull(),
+  absent: integer('absent').notNull(),
+  excused: integer('excused').notNull(),
+  total: integer('total').notNull(),
+});
+
+/** Per student per offering: their attendance in its finished sessions. */
+export const studentTallies = pgTable(
+  'student_tallies',
+  {
+    offeringId: uuid('offering_id')
+      .notNull()
+      .references(() => offerings.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.userId, { onDelete: 'cascade' }),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    ...tallyCounts(),
+  },
+  (t) => [primaryKey({ columns: [t.offeringId, t.studentId] }), index('student_tallies_student_idx').on(t.studentId)],
+);
+
+/** Per finished session per class (the students' unit): for trends and the weekday × hour view. */
+export const sessionTallies = pgTable(
+  'session_tallies',
+  {
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => attendanceSessions.id, { onDelete: 'cascade' }),
+    unitId: uuid('unit_id')
+      .notNull()
+      .references(() => units.id, { onDelete: 'cascade' }),
+    offeringId: uuid('offering_id')
+      .notNull()
+      .references(() => offerings.id, { onDelete: 'cascade' }),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    startedAt: timestamptz('started_at').notNull(),
+    ...tallyCounts(),
+  },
+  (t) => [primaryKey({ columns: [t.sessionId, t.unitId] }), index('session_tallies_offering_idx').on(t.offeringId)],
 );

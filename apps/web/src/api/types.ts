@@ -29,6 +29,10 @@ export type ImportReport = Ok<'/v1/imports/students', 'post'>;
 export type ManagedDevice = Ok<'/v1/devices/', 'get'>['items'][number];
 export type Device = Ok<'/v1/devices/{id}/approve', 'post'>;
 export type DeviceStatus = Device['status'];
+export type ReportSummary = Ok<'/v1/reports/summary', 'get'>;
+export type StudentReportRow = Ok<'/v1/reports/students', 'get'>['items'][number];
+export type StudentReport = Ok<'/v1/reports/students/{id}', 'get'>;
+export type Register = Ok<'/v1/reports/offerings/{id}/register', 'get'>;
 export type AttendanceStatus = SessionRecord['status'];
 export type SessionCounts = Session['counts'];
 

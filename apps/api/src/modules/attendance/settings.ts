@@ -10,6 +10,7 @@ export type AttendanceSettings = {
   qrGraceSeconds: number;
   defaultScanMinutes: number;
   requireRegisteredPhone: boolean;
+  minimumPercent: number;
 };
 
 export const ATTENDANCE_DEFAULTS: AttendanceSettings = {
@@ -17,6 +18,7 @@ export const ATTENDANCE_DEFAULTS: AttendanceSettings = {
   qrGraceSeconds: 10,
   defaultScanMinutes: 10,
   requireRegisteredPhone: true,
+  minimumPercent: 75,
 };
 
 export async function getAttendanceSettings(db: DbOrTx, instituteId: string): Promise<AttendanceSettings> {
