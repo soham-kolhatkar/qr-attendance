@@ -1,8 +1,9 @@
 import { ActionIcon, Badge, Button, Group, Modal, MultiSelect, Select, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconPencil, IconPlus, IconSearch, IconTrash, IconUsers } from '@tabler/icons-react';
+import { IconPencil, IconPlus, IconSearch, IconTable, IconTrash, IconUsers } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { api, unwrap } from '../../api/client';
 import { fetchAllPages, useGroups, useStructure, useSubjects, useTeachers, useTerms } from '../../api/hooks';
 import { useApiMutation } from '../../api/mutations';
@@ -118,6 +119,11 @@ export function OfferingsPage() {
                         <Tooltip label="Class list">
                           <ActionIcon variant="subtle" color="gray" onClick={() => setRosterOf(o)} aria-label="Class list">
                             <IconUsers size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Attendance register">
+                          <ActionIcon component={Link} to={`/reports/offerings/${o.id}`} variant="subtle" color="gray" aria-label="Attendance register">
+                            <IconTable size={16} />
                           </ActionIcon>
                         </Tooltip>
                         <ActionIcon variant="subtle" color="gray" onClick={() => setEditing(o)} aria-label="Edit">

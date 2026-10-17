@@ -51,8 +51,9 @@ The demo structure is `Department › Year › Division`, with Computer Engineer
 Div A and Div B. Each institute defines its own levels, so this is just an example.
 
 **Try it in the web app** (http://localhost:5173): sign in as `admin` to see the setup
-screens, or as `prof.sharma` → **My classes** → **Take attendance** → **Show QR on
-projector**, and scan the code with the student app.
+screens and **Reports** (the demo comes with six weeks of past classes), or as
+`prof.sharma` → **My classes** → **Take attendance** → **Show QR on projector**, and scan
+the code with the student app. **Register** on a class shows every student × session.
 
 **Try an attendance session through the API** (in http://localhost:3000/docs):
 1. Log in as `prof.sharma`. Find the CS301 offering with `GET /v1/offerings?mine=true`,

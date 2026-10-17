@@ -14,7 +14,7 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconBroadcast, IconPlayerPlay } from '@tabler/icons-react';
+import { IconBroadcast, IconPlayerPlay, IconTable } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -97,9 +97,14 @@ export function MyClassesPage() {
                     {o.term.name}
                     {o.faculty.length > 1 && ` · with ${o.faculty.length - 1} other teacher${o.faculty.length > 2 ? 's' : ''}`}
                   </Text>
-                  <Button leftSection={<IconPlayerPlay size={16} />} onClick={() => setStarting(o)} disabled={!!running}>
-                    Take attendance
-                  </Button>
+                  <Group gap="xs" grow>
+                    <Button leftSection={<IconPlayerPlay size={16} />} onClick={() => setStarting(o)} disabled={!!running}>
+                      Take attendance
+                    </Button>
+                    <Button component={Link} to={`/reports/offerings/${o.id}`} variant="light" leftSection={<IconTable size={16} />}>
+                      Register
+                    </Button>
+                  </Group>
                 </Stack>
               </Card>
             ))}

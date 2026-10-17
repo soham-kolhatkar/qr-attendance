@@ -9,6 +9,7 @@ import type { InstituteAuthContext } from '../../plugins/auth.js';
 import { groupAcceptsUnit } from '../groups/service.js';
 import { findUnit, loadUnitIndex } from '../structure/service.js';
 import { createUser } from '../users/service.js';
+import { markStudentsStale } from '../reports/tallies.js';
 
 export type StudentDto = {
   id: string;
@@ -265,6 +266,8 @@ export async function updateStudent(
     if (Object.keys(profileChanges).length > 0) {
       await tx.update(students).set(profileChanges).where(eq(students.userId, studentId));
     }
+    // Report trends are grouped by class.
+    if (unit && unit.id !== before.student.unitId) await markStudentsStale(tx, [studentId]);
 
     await writeAudit(tx, {
       instituteId: auth.instituteId,

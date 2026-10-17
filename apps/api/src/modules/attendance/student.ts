@@ -3,11 +3,14 @@ import type { Db } from '../../db/client.js';
 import { attendanceRecords, attendanceSessions, offerings, subjects, terms } from '../../db/schema.js';
 import type { InstituteAuthContext } from '../../plugins/auth.js';
 import { effectiveStatus } from './sessions.js';
+import { getAttendanceSettings } from './settings.js';
 
 export type Tally = { present: number; absent: number; excused: number; total: number; percentage: number | null };
 
 export type MyAttendance = {
   term: { id: string; name: string } | null;
+  /** The institute's minimum attendance percentage. */
+  minimumPercent: number;
   /** Terms the student has attendance in, newest first. */
   terms: { id: string; name: string }[];
   overall: Tally;
@@ -90,7 +93,8 @@ export async function getMyAttendance(
     .where(mine);
   const termList = termRows.sort((a, b) => b.startsOn.localeCompare(a.startsOn)).map(({ id, name }) => ({ id, name }));
   const term = termList.find((t) => t.id === termId) ?? (termId ? undefined : termList[0]);
-  const empty = { term: term ?? null, terms: termList, overall: tally([]), subjects: [], recent: [] };
+  const { minimumPercent } = await getAttendanceSettings(db, auth.instituteId);
+  const empty = { term: term ?? null, minimumPercent, terms: termList, overall: tally([]), subjects: [], recent: [] };
   if (!term) return empty;
 
   const rows = await base()
@@ -105,6 +109,7 @@ export async function getMyAttendance(
 
   return {
     term,
+    minimumPercent,
     terms: termList,
     overall: tally(counted),
     subjects: [...byOffering.entries()]

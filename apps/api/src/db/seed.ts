@@ -7,7 +7,8 @@
  * Demo data: on by default in development, opt-in elsewhere with SEED_DEMO=true (e.g. a
  * test deployment). Its passwords are public, so never enable it for a real institute.
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import { hashPassword } from '../lib/password.js';
 import type { InstituteAuthContext } from '../plugins/auth.js';
 import { createSubject, createTerm, listTerms } from '../modules/catalog/service.js';
@@ -17,7 +18,18 @@ import { createOffering } from '../modules/offerings/service.js';
 import { addLevel, createUnit, listLevels } from '../modules/structure/service.js';
 import { createUser } from '../modules/users/service.js';
 import { createDb, type Db } from './client.js';
-import { groupMembers, institutes, staffProfiles, students, users } from './schema.js';
+import {
+  attendanceRecords,
+  attendanceSessions,
+  groupMembers,
+  institutes,
+  offeringAudience,
+  offerings,
+  staffProfiles,
+  students,
+  subjects,
+  users,
+} from './schema.js';
 
 const url = process.env.DATABASE_URL;
 const ownerUsername = process.env.SEED_PLATFORM_ADMIN_USERNAME?.toLowerCase();
@@ -83,6 +95,7 @@ async function seedDemo(db: Db, ownerId: string) {
 
   if ((await listLevels(db, instituteId)).length > 0) {
     console.log('DEMO structure already exists.');
+    await seedDemoHistory(db, instituteId);
     return;
   }
 
@@ -175,6 +188,110 @@ async function seedDemo(db: Db, ownerId: string) {
     `Seeded DEMO structure. Log in with institute code "DEMO" and password "${DEMO_PASSWORD}" as: ` +
       `admin, hod.comp, prof.sharma, ${roster.map((s) => s.username).join(', ')}`,
   );
+  await seedDemoHistory(db, instituteId);
+}
+
+/** How often each demo student turns up, so the reports have defaulters to show. */
+const DEMO_ATTENDANCE: Record<string, number> = {
+  '2024comp001': 0.95,
+  '2024comp002': 0.86,
+  '2024comp003': 0.68,
+  '2024comp004': 0.55,
+};
+
+/**
+ * Six weeks of past classes for the DEMO institute, so reports and dashboards have
+ * something to show: CS301 lectures on Mon/Wed/Thu/Fri and the CS302L lab for batch A1
+ * on Tuesdays. Added once, while DEMO has hardly any sessions (a few test runs at most).
+ * Attendance is pseudo-random but the same on every run.
+ */
+async function seedDemoHistory(db: Db, instituteId: string) {
+  const now = Date.now();
+  const [existing] = await db
+    .select({ n: count() })
+    .from(attendanceSessions)
+    .where(eq(attendanceSessions.instituteId, instituteId));
+  if ((existing?.n ?? 0) >= 10) return;
+
+  const teacherId = await findUserId(db, instituteId, 'prof.sharma');
+  const classes = await db
+    .select({ offeringId: offerings.id, code: subjects.code, unitId: offeringAudience.unitId, groupId: offeringAudience.groupId })
+    .from(offerings)
+    .innerJoin(subjects, eq(subjects.id, offerings.subjectId))
+    .innerJoin(offeringAudience, eq(offeringAudience.offeringId, offerings.id))
+    .where(and(eq(offerings.instituteId, instituteId), inArray(subjects.code, ['CS301', 'CS302L'])));
+  const lecture = classes.find((c) => c.code === 'CS301' && c.unitId);
+  const lab = classes.find((c) => c.code === 'CS302L' && c.groupId);
+  if (!teacherId || !lecture || !lab) return;
+
+  const rosterOf = async (c: typeof lecture) =>
+    c.unitId
+      ? db.select({ id: students.userId, username: users.username }).from(students).innerJoin(users, eq(users.id, students.userId)).where(eq(students.unitId, c.unitId))
+      : db
+          .select({ id: groupMembers.studentId, username: users.username })
+          .from(groupMembers)
+          .innerJoin(users, eq(users.id, groupMembers.studentId))
+          .where(eq(groupMembers.groupId, c.groupId!));
+  const rosters = { lecture: await rosterOf(lecture), lab: await rosterOf(lab) };
+  const topics = ['Arrays', 'Linked lists', 'Recursion', 'Trees', 'Binary search trees', 'Heaps', 'Hashing', 'Graphs', 'Sorting', 'Searching'];
+  const labTopics = ['SQL basics', 'Joins', 'Normalisation', 'Transactions', 'Indexes', 'Views'];
+  // A deterministic stand-in for Math.random (0–1), so every run seeds the same history.
+  const chance = (a: number, b: number) => (((a * 2654435761 + (b + 1) * 40503 + 12345) >>> 0) % 10007) / 10007;
+
+  let made = 0;
+  for (let daysAgo = 42; daysAgo >= 2; daysAgo--) {
+    const day = new Date(now - daysAgo * 24 * 3600_000);
+    const weekday = day.getUTCDay(); // 0 = Sunday
+    // Times in India (UTC+5:30): lectures at 10:00, Thursday's at 11:00, the lab at 14:00.
+    const slot =
+      weekday === 2
+        ? { c: lab, roster: rosters.lab, kind: 'lab' as const, utcHour: 8, topic: labTopics[made % labTopics.length]! }
+        : [1, 3, 4, 5].includes(weekday)
+          ? { c: lecture, roster: rosters.lecture, kind: 'lecture' as const, utcHour: weekday === 4 ? 5 : 4, topic: topics[made % topics.length]! }
+          : null;
+    if (!slot) continue;
+    const startedAt = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), slot.utcHour, 30));
+    const closesAt = new Date(startedAt.getTime() + 10 * 60_000);
+    const [session] = await db
+      .insert(attendanceSessions)
+      .values({
+        instituteId,
+        offeringId: slot.c.offeringId,
+        createdBy: teacherId,
+        kind: slot.kind,
+        topic: slot.topic,
+        status: 'closed',
+        startedAt,
+        closesAt,
+        closedAt: closesAt,
+        qrSecret: randomBytes(32).toString('base64url'),
+        qrRotationSeconds: 5,
+        qrGraceSeconds: 10,
+      })
+      .returning({ id: attendanceSessions.id });
+    if (slot.roster.length > 0) {
+      await db.insert(attendanceRecords).values(
+        slot.roster.map((st, i) => {
+          const roll = chance(made, i);
+          const excused = st.username === '2024comp002' && made % 9 === 4;
+          const present = !excused && roll < (DEMO_ATTENDANCE[st.username] ?? 0.85);
+          return {
+            sessionId: session!.id,
+            studentId: st.id,
+            instituteId,
+            status: excused ? ('excused' as const) : present ? ('present' as const) : ('absent' as const),
+            method: excused ? ('manual' as const) : present ? ('qr' as const) : null,
+            markedAt: excused || present ? new Date(startedAt.getTime() + (2 + i) * 60_000) : null,
+            markedBy: excused ? teacherId : present ? st.id : null,
+            reason: excused ? 'Medical certificate' : null,
+          };
+        }),
+      );
+    }
+    made++;
+  }
+  await db.update(offerings).set({ talliesStale: true }).where(inArray(offerings.id, [lecture.offeringId, lab.offeringId]));
+  console.log(`Added ${made} past DEMO sessions for the reports.`);
 }
 
 const { db, pool } = createDb(url);

@@ -1,7 +1,7 @@
 import { Button, Card, Group, NumberInput, Stack, Switch, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { api, unwrap } from '../../api/client';
 import { useAttendanceSettings } from '../../api/hooks';
 import { useApiMutation } from '../../api/mutations';
@@ -78,6 +78,7 @@ export function SettingsPage() {
               </Stack>
             </form>
           </Card>
+          {settings.data && <MinimumCard value={settings.data.minimumPercent} />}
           {settings.data && <PhoneRequirementCard required={settings.data.requireRegisteredPhone} />}
         </Stack>
       </QueryState>
@@ -122,6 +123,38 @@ function PhoneRequirementCard({ required }: { required: boolean }) {
           label="Students must scan with their linked phone"
           description="Each student links one phone in the app; scans from any other phone or a copied app are refused. Changes apply straight away."
         />
+      </Stack>
+    </Card>
+  );
+}
+
+function MinimumCard({ value }: { value: number }) {
+  const [minimum, setMinimum] = useState<number | string>(value);
+  useEffect(() => setMinimum(value), [value]);
+  const save = useApiMutation(
+    async (minimumPercent: number) => unwrap(await api.PATCH('/v1/settings/attendance', { body: { minimumPercent } })),
+    { invalidate: [['settings'], ['reports']], success: (s) => `Minimum attendance is now ${s.minimumPercent}%.` },
+  );
+  const valid = typeof minimum === 'number' && minimum >= 1 && minimum <= 100;
+  return (
+    <Card withBorder padding="lg">
+      <Stack gap="xs">
+        <Text fw={600}>Minimum attendance</Text>
+        <Group align="flex-end">
+          <NumberInput
+            label="Students below this are listed as defaulters"
+            description="Used in reports, downloads and the student app. Changes apply straight away."
+            min={1}
+            max={100}
+            suffix="%"
+            value={minimum}
+            onChange={setMinimum}
+            w={340}
+          />
+          <Button onClick={() => valid && save.mutate(minimum as number)} disabled={!valid || minimum === value} loading={save.isPending}>
+            Save
+          </Button>
+        </Group>
       </Stack>
     </Card>
   );

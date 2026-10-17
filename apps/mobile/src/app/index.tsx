@@ -9,11 +9,11 @@ import { formatWhen, KIND_LABELS } from '@/lib/format';
 import { Banner, Button, Card, Icon, ProgressBar, Screen, Text } from '@/ui/components';
 import { type Colors, radius, space, useColors } from '@/ui/theme';
 
-/** Many institutes require 75% attendance; below that the numbers turn orange, then red. */
-function percentColor(colors: Colors, percentage: number | null) {
+/** Green at or above the institute's minimum, orange within 15 points of it, red below that. */
+function percentColor(colors: Colors, percentage: number | null, minimum: number) {
   if (percentage === null) return colors.textDim;
-  if (percentage >= 75) return colors.success;
-  return percentage >= 60 ? colors.warning : colors.danger;
+  if (percentage >= minimum) return colors.success;
+  return percentage >= minimum - 15 ? colors.warning : colors.danger;
 }
 
 export default function HomeScreen() {
@@ -80,14 +80,14 @@ function Summary({ data }: { data: MyAttendance }) {
           {data.term.name}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
-          <Text style={{ fontSize: 44, lineHeight: 50, fontWeight: '700' }} color={percentColor(colors, overall.percentage)}>
+          <Text style={{ fontSize: 44, lineHeight: 50, fontWeight: '700' }} color={percentColor(colors, overall.percentage, data.minimumPercent)}>
             {overall.percentage === null ? '—' : `${Math.round(overall.percentage)}%`}
           </Text>
           <Text dim>overall</Text>
         </View>
         <Text dim>
           Present in {overall.present} of {overall.total - overall.excused} classes
-          {overall.excused > 0 ? ` (${overall.excused} excused)` : ''}.
+          {overall.excused > 0 ? ` (${overall.excused} excused)` : ''}. Your institute's minimum is {data.minimumPercent}%.
         </Text>
       </Card>
 
@@ -100,11 +100,11 @@ function Summary({ data }: { data: MyAttendance }) {
                 <Text variant="label" style={{ flex: 1 }} numberOfLines={1}>
                   {s.subject.name}
                 </Text>
-                <Text variant="label" color={percentColor(colors, s.percentage)}>
+                <Text variant="label" color={percentColor(colors, s.percentage, data.minimumPercent)}>
                   {s.percentage === null ? '—' : `${Math.round(s.percentage)}%`}
                 </Text>
               </View>
-              <ProgressBar value={s.percentage ?? 0} color={percentColor(colors, s.percentage)} />
+              <ProgressBar value={s.percentage ?? 0} color={percentColor(colors, s.percentage, data.minimumPercent)} />
               <Text variant="caption" dim>
                 {s.subject.code} · {s.present}/{s.total - s.excused} present
               </Text>

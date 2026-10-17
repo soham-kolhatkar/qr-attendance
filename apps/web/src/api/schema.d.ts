@@ -4967,6 +4967,8 @@ export interface paths {
                                 id: string;
                                 name: string;
                             } | null;
+                            /** @description The institute's minimum attendance percentage */
+                            minimumPercent: number;
                             terms: {
                                 /** Format: uuid */
                                 id: string;
@@ -5059,6 +5061,8 @@ export interface paths {
                             defaultScanMinutes: number;
                             /** @description Scans must come from the student’s linked phone. Turn off only while students can’t use the app. */
                             requireRegisteredPhone: boolean;
+                            /** @description Students below this attendance percentage are listed as defaulters */
+                            minimumPercent: number;
                         };
                     };
                 };
@@ -5088,6 +5092,8 @@ export interface paths {
                         defaultScanMinutes?: number;
                         /** @description Scans must come from the student’s linked phone. Turn off only while students can’t use the app. */
                         requireRegisteredPhone?: boolean;
+                        /** @description Students below this attendance percentage are listed as defaulters */
+                        minimumPercent?: number;
                     };
                 };
             };
@@ -5107,6 +5113,8 @@ export interface paths {
                             defaultScanMinutes: number;
                             /** @description Scans must come from the student’s linked phone. Turn off only while students can’t use the app. */
                             requireRegisteredPhone: boolean;
+                            /** @description Students below this attendance percentage are listed as defaulters */
+                            minimumPercent: number;
                         };
                     };
                 };
@@ -5874,6 +5882,525 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard: overall attendance, defaulters, trend by day, by class, by subject, weekday × hour */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Default: the current term */
+                    termId?: string;
+                    /** @description Students in this unit or below */
+                    unitId?: string;
+                    subjectId?: string;
+                    offeringId?: string;
+                    /** @description Students in this batch or group */
+                    groupId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            term: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                startsOn: string;
+                                endsOn: string;
+                            } | null;
+                            minimumPercent: number;
+                            overall: {
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            };
+                            sessions: number;
+                            students: {
+                                total: number;
+                                below: number;
+                            };
+                            trend: {
+                                date: string;
+                                sessions: number;
+                                percentage: number | null;
+                            }[];
+                            byUnit: {
+                                /** Format: uuid */
+                                unitId: string;
+                                path: string[];
+                                students: number;
+                                below: number;
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            }[];
+                            bySubject: {
+                                /** Format: uuid */
+                                subjectId: string;
+                                code: string;
+                                name: string;
+                                sessions: number;
+                                students: number;
+                                below: number;
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            }[];
+                            heatmap: {
+                                /** @description 1 = Monday … 7 = Sunday */
+                                weekday: number;
+                                hour: number;
+                                sessions: number;
+                                percentage: number | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attendance per student; with below=true, the defaulter list */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Default: the current term */
+                    termId?: string;
+                    /** @description Students in this unit or below */
+                    unitId?: string;
+                    subjectId?: string;
+                    offeringId?: string;
+                    /** @description Students in this batch or group */
+                    groupId?: string;
+                    /** @description Only students below the minimum percentage */
+                    below?: string;
+                    q?: string;
+                    /** @description Default: percentage for defaulters, otherwise roll */
+                    sort?: "percentage" | "name" | "roll";
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                student: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    username: string;
+                                    fullName: string;
+                                    rollNo: string | null;
+                                    unitPath: string[];
+                                };
+                                below: boolean;
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            }[];
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                            term: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                startsOn: string;
+                                endsOn: string;
+                            } | null;
+                            minimumPercent: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/students/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the student list as Excel (with a column per subject) or PDF */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Default: the current term */
+                    termId?: string;
+                    /** @description Students in this unit or below */
+                    unitId?: string;
+                    subjectId?: string;
+                    offeringId?: string;
+                    /** @description Students in this batch or group */
+                    groupId?: string;
+                    /** @description Only students below the minimum percentage */
+                    below?: string;
+                    q?: string;
+                    /** @description Default: percentage for defaulters, otherwise roll */
+                    sort?: "percentage" | "name" | "roll";
+                    format?: "xlsx" | "pdf";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/students/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One student's attendance by subject and session (faculty: the classes they teach) */
+        get: {
+            parameters: {
+                query?: {
+                    termId?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            student: {
+                                /** Format: uuid */
+                                id: string;
+                                username: string;
+                                fullName: string;
+                                rollNo: string | null;
+                                unitPath: string[];
+                            };
+                            term: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                startsOn: string;
+                                endsOn: string;
+                            } | null;
+                            minimumPercent: number;
+                            overall: {
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            };
+                            subjects: {
+                                /** Format: uuid */
+                                subjectId: string;
+                                code: string;
+                                name: string;
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            }[];
+                            sessions: {
+                                /** Format: uuid */
+                                sessionId: string;
+                                /** Format: date-time */
+                                startedAt: string;
+                                kind: string;
+                                topic: string | null;
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                /** @enum {string} */
+                                status: "present" | "absent" | "excused";
+                                /** @enum {string|null} */
+                                method: "qr" | "manual" | null;
+                                /** Format: date-time */
+                                markedAt: string | null;
+                                reason: string | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/offerings/{id}/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attendance register for a class: every student × every session */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            offering: {
+                                /** Format: uuid */
+                                id: string;
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                term: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                };
+                                faculty: string[];
+                            };
+                            minimumPercent: number;
+                            sessions: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: date-time */
+                                startedAt: string;
+                                kind: string;
+                                topic: string | null;
+                                /** @description Still taking attendance; not counted yet */
+                                open: boolean;
+                            }[];
+                            students: {
+                                /** Format: uuid */
+                                id: string;
+                                username: string;
+                                fullName: string;
+                                rollNo: string | null;
+                                unitPath: string[];
+                                /** @description One per session; null = not on that session's list */
+                                marks: ("present" | "absent" | "excused" | null)[];
+                                below: boolean;
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions the student was on the list for */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null with nothing counted yet */
+                                percentage: number | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/offerings/{id}/register/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the attendance register as Excel or PDF */
+        get: {
+            parameters: {
+                query?: {
+                    format?: "xlsx" | "pdf";
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;

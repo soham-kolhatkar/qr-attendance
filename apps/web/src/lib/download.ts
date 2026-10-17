@@ -9,10 +9,11 @@ export function saveBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Downloads an authenticated API file (e.g. an import template). */
-export async function downloadFromApi(path: string, filename: string) {
+/** Downloads an authenticated API file (e.g. an import template), named as the server suggests unless given a name. */
+export async function downloadFromApi(path: string, filename?: string) {
   const res = await checkedFetch(path);
-  saveBlob(await res.blob(), filename);
+  const suggested = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1];
+  saveBlob(await res.blob(), filename ?? suggested ?? 'download');
 }
 
 /** Saves rows as a CSV that Excel opens correctly (UTF-8 BOM, quoted cells). */
