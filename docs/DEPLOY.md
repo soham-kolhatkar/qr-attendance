@@ -69,6 +69,20 @@ owner account exists. Free services have no shell, so this is automatic.
 
 Every push to `master` redeploys automatically. Data in the database is kept.
 
+## Checking a deployment
+
+A smoke test runs the core path against the live site with a real browser:
+1. A teacher starts a session and opens the projector.
+2. The test reads the QR code from the screen and an absent student scans it.
+3. Both screens update live, and the code rotates.
+
+It works with existing data, using the DEMO institute (so `SEED_DEMO=true`), and adds at
+most one closed session:
+
+```bash
+cd apps/web && E2E_BASE_URL=https://<your-app>.onrender.com npx playwright test smoke.spec.ts
+```
+
 ## Limits of the free plan: read before using it in a class
 
 - **It falls asleep.** After 15 minutes without visits the service sleeps, and the next
