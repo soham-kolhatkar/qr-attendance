@@ -6,6 +6,7 @@ import { loadConfig } from '../src/config.js';
 import { createDb, type Db } from '../src/db/client.js';
 import { users } from '../src/db/schema.js';
 import { hashPassword } from '../src/lib/password.js';
+import { type AttestOptions, attestNewKey, type FakePhoneKey, TEST_SIGNING_DIGEST, testAuthority } from './attestation-fixture.js';
 
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? 'postgres://qra:qra@localhost:55432/qr_attendance_test';
@@ -27,6 +28,10 @@ export function useTestApp() {
   const ctx = {
     app: undefined as unknown as App,
     db,
+    /** Serial numbers the test app treats as revoked by Google. */
+    revokedSerials: new Set<string>(),
+    /** Each student's linked test phone, by user id (see signedScan). */
+    phones: new Map<string, Promise<TestPhone>>(),
     /** Added to the real clock as the app sees it; reset before each test. */
     clockOffsetMs: 0,
     /** Moves the app's clock forward. */
@@ -39,7 +44,18 @@ export function useTestApp() {
     // institutes is referenced (directly or indirectly) by every table, so CASCADE empties them all.
     await db.execute(sql`TRUNCATE institutes, users, audit_logs RESTART IDENTITY CASCADE`);
     ctx.clockOffsetMs = 0;
-    ctx.app = await buildApp({ config, db, clock: () => Date.now() + ctx.clockOffsetMs });
+    ctx.revokedSerials = new Set();
+    ctx.phones = new Map();
+    ctx.app = await buildApp({
+      config,
+      db,
+      clock: () => Date.now() + ctx.clockOffsetMs,
+      attestation: {
+        roots: [(await testAuthority).rootPem],
+        signingCertDigests: [TEST_SIGNING_DIGEST],
+        revokedSerials: async () => ctx.revokedSerials,
+      },
+    });
   });
   afterEach(async () => {
     await ctx.app.close();
@@ -51,6 +67,7 @@ export function useTestApp() {
 }
 
 export type Tokens = { accessToken: string; refreshToken: string };
+export type TestContext = ReturnType<typeof useTestApp>;
 
 /** Idempotent, so several institutes can be set up in one test. */
 export async function createPlatformAdmin(db: Db, username = 'owner'): Promise<void> {
@@ -207,3 +224,55 @@ export async function setupClass(app: App, db: Db) {
 }
 
 export const loginStudent = (app: App, username: string) => login(app, { instituteCode: 'ALPHA', username });
+
+// ---------------------------------------------------------------------------
+// Phones
+// ---------------------------------------------------------------------------
+
+export type TestPhone = { deviceId: string; status: string; phoneId: string; key: FakePhoneKey };
+
+const userIdOf = (tokens: Tokens) =>
+  (JSON.parse(Buffer.from(tokens.accessToken.split('.')[1]!, 'base64url').toString()) as { sub: string }).sub;
+
+/**
+ * Links a phone the way the app does: challenge, key with attestation, register. Returns
+ * the raw response; `phone` is set when it succeeded.
+ */
+export async function linkPhone(
+  app: App,
+  tokens: Tokens,
+  opts: Partial<AttestOptions> & { phoneId?: string; model?: string } = {},
+) {
+  const api = as(app, tokens);
+  const { challenge } = expectStatus(await api.post('/v1/devices/challenge'), 200);
+  const key = await attestNewKey({ challenge, ...opts });
+  const phoneId = opts.phoneId ?? `phone-${Math.random().toString(16).slice(2)}`;
+  const res = await api.post('/v1/devices', {
+    platform: 'android',
+    challenge: opts.challenge ?? challenge,
+    certificateChain: key.chain,
+    phoneId,
+    model: opts.model ?? 'Test Phone',
+    osVersion: '16',
+    appVersion: '1.0.0',
+  });
+  const phone: TestPhone | undefined =
+    res.statusCode === 201 ? { deviceId: res.json().device.id, status: res.json().device.status, phoneId, key } : undefined;
+  return { res, phone, key };
+}
+
+/** Scans as the student would with the app: signed by their linked phone (linked on first use). */
+export async function signedScan(ctx: TestContext, tokens: Tokens, qr: string): Promise<Response> {
+  const userId = userIdOf(tokens);
+  if (!ctx.phones.has(userId)) {
+    ctx.phones.set(
+      userId,
+      linkPhone(ctx.app, tokens).then(({ res, phone }) => phone ?? Promise.reject(new Error(`linking a phone failed: ${res.body}`))),
+    );
+  }
+  const phone = await ctx.phones.get(userId)!;
+  return as(ctx.app, tokens).post('/v1/attendance/scan', {
+    qr,
+    device: { id: phone.deviceId, signature: phone.key.sign(phone.deviceId, qr) },
+  });
+}

@@ -19,6 +19,7 @@ services:
         - docs/**
         - "**/*.md"
         - apps/web/e2e/**
+        - apps/mobile/**
         - scripts/**
     envVars:
       - key: NODE_ENV
@@ -44,6 +45,10 @@ services:
         value: owner
       - key: SEED_PLATFORM_ADMIN_PASSWORD
         sync: false
+      # The student app's signing certificate (public; printed by `npm run build:android`).
+      # Phones must run an app signed with it to be linked. Comma-separate several.
+      - key: ANDROID_SIGNING_CERT_SHA256
+        value: 45:85:BC:69:6B:47:C3:14:58:CD:22:FB:A2:69:CF:20:B9:76:A9:CF:58:15:CE:B0:6E:82:29:51:25:8B:80:6B
       # Test deployment only: adds the DEMO institute (public demo passwords).
       # Set to "false" before any real institute uses this deployment.
       - key: SEED_DEMO

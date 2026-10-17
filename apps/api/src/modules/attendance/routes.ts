@@ -26,6 +26,7 @@ import {
   startSession,
 } from './sessions.js';
 import { getAttendanceSettings, updateAttendanceSettings } from './settings.js';
+import { getMyAttendance } from './student.js';
 
 const security = [{ bearerAuth: [] }];
 const SSE_PING_MS = 15_000;
@@ -373,7 +374,16 @@ export const scanRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ['attendance'],
         security,
         summary: 'Mark yourself present by submitting the scanned QR code',
-        body: z.object({ qr: z.string().min(1).max(200) }),
+        body: z.object({
+          qr: z.string().min(1).max(200),
+          device: z
+            .object({
+              id: z.uuid(),
+              signature: z.string().min(16).max(200).describe('Base64 ECDSA P-256 signature of "QAS1|<device id>|<qr>"'),
+            })
+            .optional()
+            .describe('Proof that the scan comes from the student’s linked phone'),
+        }),
         response: {
           200: z.object({
             status: z.literal('present'),
@@ -393,7 +403,50 @@ export const scanRoutes: FastifyPluginAsyncZod = async (app) => {
         },
       },
     },
-    (req) => scanQr(app.db, app.live, getInstituteAuth(req), req.body.qr, app.now(), req.ip),
+    (req) => scanQr(app.db, app.live, getInstituteAuth(req), req.body, app.now(), req.ip),
+  );
+
+  const tallySchema = {
+    present: z.number().int(),
+    absent: z.number().int(),
+    excused: z.number().int(),
+    total: z.number().int().describe('Finished sessions (not cancelled, no longer taking attendance)'),
+    percentage: z.number().nullable().describe('present ÷ (total − excused) × 100; null before the first class'),
+  };
+  const subjectRefSchema = z.object({ code: z.string(), name: z.string() });
+
+  app.get(
+    '/mine',
+    {
+      preHandler: guard('student'),
+      schema: {
+        tags: ['attendance'],
+        security,
+        summary: 'My attendance for a term: overall, per subject, and recent sessions',
+        querystring: z.object({ termId: z.uuid().optional().describe('Default: the term of my latest class') }),
+        response: {
+          200: z.object({
+            term: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+            terms: z.array(z.object({ id: z.uuid(), name: z.string() })),
+            overall: z.object(tallySchema),
+            subjects: z.array(z.object({ offeringId: z.uuid(), subject: subjectRefSchema, ...tallySchema })),
+            recent: z.array(
+              z.object({
+                sessionId: z.uuid(),
+                startedAt: z.iso.datetime(),
+                kind: z.string(),
+                topic: z.string().nullable(),
+                subject: subjectRefSchema,
+                status: z.enum(ATTENDANCE_STATUSES),
+                method: z.enum(['qr', 'manual']).nullable(),
+                open: z.boolean().describe('Still taking attendance'),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    (req) => getMyAttendance(app.db, getInstituteAuth(req), req.query.termId, app.now()),
   );
 };
 
@@ -406,6 +459,9 @@ const attendanceSettingsSchema = z.object({
     .max(60)
     .describe('How long a code still works after the screen moved on (covers slow networks)'),
   defaultScanMinutes: z.number().int().min(1).max(240).describe('How long scanning stays open after a session starts'),
+  requireRegisteredPhone: z
+    .boolean()
+    .describe('Scans must come from the student’s linked phone. Turn off only while students can’t use the app.'),
 });
 
 export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {

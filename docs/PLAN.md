@@ -46,22 +46,50 @@ Android 10+ and iOS do not give apps the IMEI or the real MAC address, so we can
 either. Instead we bind each student to a **cryptographic key generated inside the phone's
 secure hardware**, which cannot be copied off the phone.
 
-1. **Registration.** On first login the app asks the server for a one-time challenge and
-   creates a key in secure hardware: Android Keystore with key attestation, or iOS App
-   Attest via `@expo/app-integrity`. The server checks the attestation against the
-   Google/Apple root certificates, the challenge, our app ID and signing certificate, and
-   that the key really is in hardware. It then stores the public key against the student.
-2. **Every scan is signed** with that key. A request from any other phone, an emulator, a
-   modified app or a script fails verification.
+1. **Linking.** After the student signs in, the app asks the server for a one-time
+   challenge (signed by the server, valid 10 minutes) and creates an ECDSA P-256 signing
+   key in the Android Keystore with that challenge built into the key's **attestation**. The
+   hardware signs a certificate chain for the key that ends at a Google root. The server
+   checks:
+   - the chain is correctly signed all the way to one of Google's roots (matched by public
+     key), intermediates are in date, and no certificate is on Google's revocation list
+     (fetched hourly; if Google can't be reached the last list is used);
+   - the key was **generated** (not imported) inside the **TEE or StrongBox** (software keys,
+     i.e. emulators, are refused), is a P-256 signing key, and was made for our challenge;
+   - the requesting app is ours: package name and **signing certificate** (a re-signed,
+     modified copy of the app is refused; `ANDROID_SIGNING_CERT_SHA256`).
+
+   It then stores the public key against the student. Tested against 89 attestation chains
+   from real phones of 20+ makers, and against attestation formats of future Android
+   releases (unknown fields are ignored).
+2. **Every scan is signed** with that key: the app signs `QAS1|<device id>|<scanned code>`.
+   A request from any other phone, an emulator, a modified app or a script fails. Each
+   attendance record keeps which phone marked it.
 3. **One phone per student, one student per phone.**
-   - A student has at most one active device.
-   - A phone already bound to student A cannot be bound to student B. We detect this with
-     ANDROID_ID on Android, and with the vendor ID plus a DeviceCheck bit on iOS.
-4. **Changing phones** (new phone or reinstall): the student raises a request, and an
-   admin or HOD approves it. The old key is revoked. The institute sets a cooldown, and
-   every change goes in the audit log.
-5. **Rooted or jailbroken devices.** Play Integrity and App Attest checks can reject them.
-   This is a setting each institute can turn on.
+   - A student has at most one active phone (enforced by a unique index).
+   - A phone already linked to student A can't be linked to student B. The app sends the
+     phone's ANDROID_ID (stable for our app until a factory reset); the server stores only
+     a hash, scoped to the institute.
+4. **Changing phones.**
+   - First phone: linked straight away.
+   - The app reinstalled on the **same, unmodified** phone (same ANDROID_ID, verified boot,
+     locked bootloader): the new key replaces the old one straight away.
+   - A **different** phone (or a rooted one): a request that an admin or the student's HOD
+     approves on the **Phones** page, which shows the new and old phone and how many phones
+     the student has used. The old phone keeps working until approval. Newer requests
+     supersede older ones.
+   - Lost or stolen phone: the admin **unlinks** it; the student's next phone links without
+     approval.
+   - Every link, request, approval, rejection and unlink is in the audit log.
+5. **Rooted phones.** The attestation reports whether the bootloader is unlocked or the
+   phone runs modified software. Such phones still hold their key in hardware; the Phones
+   page flags them as "Modified phone" and a reinstall on one always needs approval.
+   Refusing them outright (and Play Integrity) is a possible per-institute setting later.
+6. **The requirement is a setting.** "Students must scan with their linked phone" is on by
+   default; an admin can switch it off (for example while students can't install the app)
+   and the change applies straight away.
+7. **iOS** will use App Attest (needs the $99/year Apple developer account); until then the
+   app is Android-only and iPhone users are marked by their teacher.
 
 ### 3.2 Rotating QR code
 
@@ -90,7 +118,8 @@ For each scan the server checks, in order:
    signature is valid. Nothing about the session is revealed before this check passes.
 3. The session is open, not closed or cancelled.
 4. The code is fresh.
-5. The device is active, belongs to this student, and its signature is valid (Feature 5).
+5. The scan is signed by the student's linked phone (§3.1), unless the institute has
+   switched that requirement off.
 6. The student is on the session's list. That list is taken when the session starts, so
    later class changes never rewrite history.
 7. Then it marks the student present.
@@ -157,6 +186,7 @@ example a lab for batch A2 only. All of this can be bulk-imported from Excel/CSV
 | Terms | manage | view | view | — |
 | Subjects | manage | manage their department's | view | — |
 | Offerings | manage | manage those taught to their department | view the ones they teach | — |
+| Students' phones | approve switches, unlink | the same, for their department | — | link their own phone |
 
 **Import rules (students and staff):**
 
@@ -178,7 +208,7 @@ example a lab for batch A2 only. All of this can be bulk-imported from Excel/CSV
 | API + web app | Node 24, TypeScript, Fastify, Zod, Drizzle ORM; the API also serves the built web app (one address, no CORS) | Render free web service (test environment, `render.yaml`) |
 | Database | PostgreSQL 17 | Neon free plan (direct connection; see docs/DEPLOY.md) |
 | Web | React + Vite, Mantine UI, TanStack Query, React Router, typed API client generated from OpenAPI | Cloudflare Pages / Vercel |
-| Mobile | Expo (React Native) dev builds, `expo-camera`, `@expo/app-integrity` | EAS Build free tier |
+| Mobile | Expo SDK 58 (React Native), Expo Router, `expo-camera`, a small native module for Keystore keys (`apps/mobile/modules/device-key`) | Built locally (`npm run build:android`); EAS Build later |
 | Email / push | Brevo or Resend free tier / Expo push | free |
 | API docs | OpenAPI generated from the Zod schemas, at `/docs` | — |
 
@@ -199,7 +229,7 @@ Everything else stays on free tiers until a client signs.
 | 2 ✅ | Academic structure | Structure levels, unit tree, groups/batches, terms, subjects, course offerings, student profiles, HOD scope, Excel/CSV bulk import |
 | 3 ✅ | Attendance engine | Sessions, rotating-QR engine, scan verification, manual marking with reasons, auto-close and absentees, live headcount (SSE) |
 | 4 ✅ | Web app I | Login, admin screens for structure, users and imports, faculty "start session" and projector QR page with live count |
-| 5 | Mobile app + device binding | Expo app: login, device registration with hardware attestation, QR scanner, my attendance; device change requests and approvals |
+| 5 ✅ | Mobile app + device binding | Expo app (Android): login, phone linking with hardware key attestation, QR scanner, my attendance; phone change requests and approvals (web "Phones" page) |
 | 6 | Reports & dashboards | Student, faculty, HOD and admin dashboards; defaulter list (< threshold); trends and heatmaps; Excel/PDF export |
 | 7 | Corrections & notifications | Attendance correction requests and approvals, audit-log viewer, email and push alerts (e.g. low attendance) |
 | 8 | Integration API | Per-institute API keys, webhooks (e.g. `attendance.recorded`), published OpenAPI docs |

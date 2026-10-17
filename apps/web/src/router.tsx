@@ -6,6 +6,7 @@ import { CatalogPage } from './pages/admin/CatalogPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { ImportPage } from './pages/admin/ImportPage';
 import { OfferingsPage } from './pages/admin/OfferingsPage';
+import { PhonesPage } from './pages/admin/PhonesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { StaffPage } from './pages/admin/StaffPage';
 import { StructurePage } from './pages/admin/StructurePage';
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
       { path: 'structure', element: <RequireAuth roles={ADMIN}><StructurePage /></RequireAuth> },
       { path: 'groups', element: <RequireAuth roles={MANAGERS}><GroupsPage /></RequireAuth> },
       { path: 'students', element: <RequireAuth roles={MANAGERS}><StudentsPage /></RequireAuth> },
+      { path: 'phones', element: <RequireAuth roles={MANAGERS}><PhonesPage /></RequireAuth> },
       { path: 'staff', element: <RequireAuth roles={ADMIN}><StaffPage /></RequireAuth> },
       { path: 'import', element: <RequireAuth roles={ADMIN}><ImportPage /></RequireAuth> },
       { path: 'catalog', element: <RequireAuth roles={MANAGERS}><CatalogPage /></RequireAuth> },

@@ -4830,6 +4830,13 @@ export interface paths {
                 content: {
                     "application/json": {
                         qr: string;
+                        /** @description Proof that the scan comes from the student’s linked phone */
+                        device?: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @description Base64 ECDSA P-256 signature of "QAS1|<device id>|<qr>" */
+                            signature: string;
+                        };
                     };
                 };
             };
@@ -4928,6 +4935,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/attendance/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My attendance for a term: overall, per subject, and recent sessions */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Default: the term of my latest class */
+                    termId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            term: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                            } | null;
+                            terms: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                            }[];
+                            overall: {
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions (not cancelled, no longer taking attendance) */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null before the first class */
+                                percentage: number | null;
+                            };
+                            subjects: {
+                                /** Format: uuid */
+                                offeringId: string;
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                present: number;
+                                absent: number;
+                                excused: number;
+                                /** @description Finished sessions (not cancelled, no longer taking attendance) */
+                                total: number;
+                                /** @description present ÷ (total − excused) × 100; null before the first class */
+                                percentage: number | null;
+                            }[];
+                            recent: {
+                                /** Format: uuid */
+                                sessionId: string;
+                                /** Format: date-time */
+                                startedAt: string;
+                                kind: string;
+                                topic: string | null;
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                /** @enum {string} */
+                                status: "present" | "absent" | "excused";
+                                /** @enum {string|null} */
+                                method: "qr" | "manual" | null;
+                                /** @description Still taking attendance */
+                                open: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings/attendance": {
         parameters: {
             query?: never;
@@ -4958,6 +5057,8 @@ export interface paths {
                             qrGraceSeconds: number;
                             /** @description How long scanning stays open after a session starts */
                             defaultScanMinutes: number;
+                            /** @description Scans must come from the student’s linked phone. Turn off only while students can’t use the app. */
+                            requireRegisteredPhone: boolean;
                         };
                     };
                 };
@@ -4985,6 +5086,8 @@ export interface paths {
                         qrGraceSeconds?: number;
                         /** @description How long scanning stays open after a session starts */
                         defaultScanMinutes?: number;
+                        /** @description Scans must come from the student’s linked phone. Turn off only while students can’t use the app. */
+                        requireRegisteredPhone?: boolean;
                     };
                 };
             };
@@ -5002,11 +5105,779 @@ export interface paths {
                             qrGraceSeconds: number;
                             /** @description How long scanning stays open after a session starts */
                             defaultScanMinutes: number;
+                            /** @description Scans must come from the student’s linked phone. Turn off only while students can’t use the app. */
+                            requireRegisteredPhone: boolean;
                         };
                     };
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/devices/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start linking this phone: a one-time challenge for the key attestation */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            challenge: string;
+                            /** Format: date-time */
+                            expiresAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Students’ phones: change requests (pending), linked (active) or past ones */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                    status?: "pending" | "active" | "revoked" | "rejected";
+                    /** @description Name, username or roll number */
+                    q?: string;
+                    unitId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                platform: "android" | "ios";
+                                /** @enum {string} */
+                                status: "pending" | "active" | "revoked" | "rejected";
+                                model: string | null;
+                                osVersion: string | null;
+                                appVersion: string | null;
+                                /**
+                                 * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                                 * @enum {string}
+                                 */
+                                securityLevel: "tee" | "strongbox";
+                                /**
+                                 * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                                 * @enum {string}
+                                 */
+                                bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                                bootloaderLocked: boolean | null;
+                                /** @description Security patch, e.g. 202609 = September 2026 */
+                                osPatchLevel: number | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                activatedAt: string | null;
+                                /** Format: date-time */
+                                endedAt: string | null;
+                                endReason: string | null;
+                                student: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    username: string;
+                                    fullName: string;
+                                    rollNo: string | null;
+                                    unitPath: string[];
+                                };
+                                /** @description For a change request: the phone it would replace */
+                                replaces: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** @enum {string} */
+                                    platform: "android" | "ios";
+                                    /** @enum {string} */
+                                    status: "pending" | "active" | "revoked" | "rejected";
+                                    model: string | null;
+                                    osVersion: string | null;
+                                    appVersion: string | null;
+                                    /**
+                                     * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                                     * @enum {string}
+                                     */
+                                    securityLevel: "tee" | "strongbox";
+                                    /**
+                                     * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                                     * @enum {string}
+                                     */
+                                    bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                                    bootloaderLocked: boolean | null;
+                                    /** @description Security patch, e.g. 202609 = September 2026 */
+                                    osPatchLevel: number | null;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                    /** Format: date-time */
+                                    activatedAt: string | null;
+                                    /** Format: date-time */
+                                    endedAt: string | null;
+                                    endReason: string | null;
+                                } | null;
+                                history: {
+                                    phones: number;
+                                    /** Format: date-time */
+                                    lastLinkedAt: string | null;
+                                };
+                            }[];
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Link this phone (or ask to switch to it) with a hardware key attestation
+         * @description Active straight away for a first phone or a reinstall on the same phone; otherwise "pending" until an admin or HOD approves.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        platform: "android";
+                        challenge: string;
+                        /** @description Base64 DER, key certificate first */
+                        certificateChain: string[];
+                        /** @description ANDROID_ID */
+                        phoneId: string;
+                        model?: string;
+                        osVersion?: string;
+                        appVersion?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            device: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                platform: "android" | "ios";
+                                /** @enum {string} */
+                                status: "pending" | "active" | "revoked" | "rejected";
+                                model: string | null;
+                                osVersion: string | null;
+                                appVersion: string | null;
+                                /**
+                                 * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                                 * @enum {string}
+                                 */
+                                securityLevel: "tee" | "strongbox";
+                                /**
+                                 * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                                 * @enum {string}
+                                 */
+                                bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                                bootloaderLocked: boolean | null;
+                                /** @description Security patch, e.g. 202609 = September 2026 */
+                                osPatchLevel: number | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                activatedAt: string | null;
+                                /** Format: date-time */
+                                endedAt: string | null;
+                                endReason: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My linked phone, and a phone change waiting for approval */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            active: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                platform: "android" | "ios";
+                                /** @enum {string} */
+                                status: "pending" | "active" | "revoked" | "rejected";
+                                model: string | null;
+                                osVersion: string | null;
+                                appVersion: string | null;
+                                /**
+                                 * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                                 * @enum {string}
+                                 */
+                                securityLevel: "tee" | "strongbox";
+                                /**
+                                 * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                                 * @enum {string}
+                                 */
+                                bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                                bootloaderLocked: boolean | null;
+                                /** @description Security patch, e.g. 202609 = September 2026 */
+                                osPatchLevel: number | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                activatedAt: string | null;
+                                /** Format: date-time */
+                                endedAt: string | null;
+                                endReason: string | null;
+                            } | null;
+                            pending: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                platform: "android" | "ios";
+                                /** @enum {string} */
+                                status: "pending" | "active" | "revoked" | "rejected";
+                                model: string | null;
+                                osVersion: string | null;
+                                appVersion: string | null;
+                                /**
+                                 * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                                 * @enum {string}
+                                 */
+                                securityLevel: "tee" | "strongbox";
+                                /**
+                                 * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                                 * @enum {string}
+                                 */
+                                bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                                bootloaderLocked: boolean | null;
+                                /** @description Security patch, e.g. 202609 = September 2026 */
+                                osPatchLevel: number | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                activatedAt: string | null;
+                                /** Format: date-time */
+                                endedAt: string | null;
+                                endReason: string | null;
+                            } | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/pending-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many phone changes are waiting for approval */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a phone change; the old phone stops working */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            platform: "android" | "ios";
+                            /** @enum {string} */
+                            status: "pending" | "active" | "revoked" | "rejected";
+                            model: string | null;
+                            osVersion: string | null;
+                            appVersion: string | null;
+                            /**
+                             * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                             * @enum {string}
+                             */
+                            securityLevel: "tee" | "strongbox";
+                            /**
+                             * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                             * @enum {string}
+                             */
+                            bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                            bootloaderLocked: boolean | null;
+                            /** @description Security patch, e.g. 202609 = September 2026 */
+                            osPatchLevel: number | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            activatedAt: string | null;
+                            /** Format: date-time */
+                            endedAt: string | null;
+                            endReason: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn down a phone change; the old phone keeps working */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            platform: "android" | "ios";
+                            /** @enum {string} */
+                            status: "pending" | "active" | "revoked" | "rejected";
+                            model: string | null;
+                            osVersion: string | null;
+                            appVersion: string | null;
+                            /**
+                             * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                             * @enum {string}
+                             */
+                            securityLevel: "tee" | "strongbox";
+                            /**
+                             * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                             * @enum {string}
+                             */
+                            bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                            bootloaderLocked: boolean | null;
+                            /** @description Security patch, e.g. 202609 = September 2026 */
+                            osPatchLevel: number | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            activatedAt: string | null;
+                            /** Format: date-time */
+                            endedAt: string | null;
+                            endReason: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlink a student’s phone (lost, stolen, sold); their next phone links without approval */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            platform: "android" | "ios";
+                            /** @enum {string} */
+                            status: "pending" | "active" | "revoked" | "rejected";
+                            model: string | null;
+                            osVersion: string | null;
+                            appVersion: string | null;
+                            /**
+                             * @description tee = the phone’s trusted environment; strongbox = a separate security chip
+                             * @enum {string}
+                             */
+                            securityLevel: "tee" | "strongbox";
+                            /**
+                             * @description verified = the phone runs its maker’s software; otherwise it may be rooted or modified
+                             * @enum {string}
+                             */
+                            bootState: "verified" | "self_signed" | "unverified" | "failed" | "unknown";
+                            bootloaderLocked: boolean | null;
+                            /** @description Security patch, e.g. 202609 = September 2026 */
+                            osPatchLevel: number | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            activatedAt: string | null;
+                            /** Format: date-time */
+                            endedAt: string | null;
+                            endReason: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }

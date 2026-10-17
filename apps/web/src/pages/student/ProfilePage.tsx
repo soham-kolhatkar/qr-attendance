@@ -1,8 +1,10 @@
 import { Alert, Badge, Card, Group, Stack, Table, Text } from '@mantine/core';
 import { IconDeviceMobile } from '@tabler/icons-react';
+import { useQuery } from '@tanstack/react-query';
+import { api, unwrap } from '../../api/client';
 import { useMe } from '../../auth/AuthContext';
 import { PageHeader } from '../../components/common';
-import { ROLE_LABELS } from '../../lib/format';
+import { formatDate, ROLE_LABELS } from '../../lib/format';
 
 export function ProfilePage() {
   const me = useMe();
@@ -10,11 +12,7 @@ export function ProfilePage() {
     <>
       <PageHeader title="My profile" />
       <Stack maw={640}>
-        {me.user.role === 'student' && (
-          <Alert icon={<IconDeviceMobile />} color="indigo" title="Marking attendance">
-            Use the QR Attendance app on your phone and scan the code your teacher shows in class.
-          </Alert>
-        )}
+        {me.user.role === 'student' && <MyPhone />}
         <Card withBorder padding="lg">
           <Table variant="vertical" withRowBorders={false} verticalSpacing={6}>
             <Table.Tbody>
@@ -72,5 +70,29 @@ export function ProfilePage() {
         </Text>
       </Stack>
     </>
+  );
+}
+
+function MyPhone() {
+  const phones = useQuery({ queryKey: ['devices', 'mine'], queryFn: async () => unwrap(await api.GET('/v1/devices/mine')) });
+  const { active, pending } = phones.data ?? { active: null, pending: null };
+  return (
+    <Alert icon={<IconDeviceMobile />} color="indigo" title="Marking attendance">
+      <Stack gap={4}>
+        <Text size="sm">Use the QR Attendance app on your phone and scan the code your teacher shows in class.</Text>
+        {active && (
+          <Text size="sm">
+            Your linked phone: <b>{active.model ?? 'phone'}</b>, since {formatDate(active.activatedAt)}. Only this phone
+            can mark your attendance.
+          </Text>
+        )}
+        {!active && phones.isSuccess && <Text size="sm">Sign in to the app on your phone to link it.</Text>}
+        {pending && (
+          <Text size="sm">
+            Switching to <b>{pending.model ?? 'a new phone'}</b> is waiting for approval from your admin or HOD.
+          </Text>
+        )}
+      </Stack>
+    </Alert>
   );
 }

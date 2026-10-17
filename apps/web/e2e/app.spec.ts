@@ -1,6 +1,7 @@
-import { expect, type Page, test } from '@playwright/test';
+import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
+import { insertPhone } from './phones';
 
 /**
  * Walks through the product the way people use it, against the DEMO institute:
@@ -11,6 +12,8 @@ import { PNG } from 'pngjs';
 
 /** API address: the deployment itself when testing one (same origin), else the local test API. */
 const API = process.env.E2E_BASE_URL ?? 'http://localhost:3100';
+/** Testing a deployment: no access to its database. */
+const EXTERNAL = !!process.env.E2E_BASE_URL;
 const PASSWORD = 'demo-pass-123';
 /** Full-page screenshot once open/close animations have settled. */
 async function shot(page: Page, name: string) {
@@ -40,6 +43,17 @@ async function signOut(page: Page) {
 async function decodeQr(page: Page): Promise<string | null> {
   const png = PNG.sync.read(await page.getByTestId('projector-qr').screenshot());
   return jsQR(new Uint8ClampedArray(png.data), png.width, png.height)?.data ?? null;
+}
+
+async function setPhoneRequirement(request: APIRequestContext, requireRegisteredPhone: boolean) {
+  const { accessToken } = await (
+    await request.post(`${API}/v1/auth/login`, { data: { instituteCode: 'DEMO', username: 'admin', password: PASSWORD } })
+  ).json();
+  const res = await request.patch(`${API}/v1/settings/attendance`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    data: { requireRegisteredPhone },
+  });
+  expect(res.status()).toBe(200);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -91,7 +105,33 @@ test('admin screens', async ({ page }) => {
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await expect(page.getByLabel('QR code changes every (seconds)')).toHaveValue('5');
+  await expect(page.getByLabel('Students must scan with their linked phone')).toBeChecked();
   await shot(page, '08-settings');
+});
+
+test('admin approves a student switching phones', async ({ page }) => {
+  test.skip(EXTERNAL, 'Needs the test database to create phones');
+  await insertPhone('2024comp003', { model: 'Galaxy A14' });
+  await insertPhone('2024comp003', { status: 'pending', model: 'Redmi Note 13' });
+
+  await signIn(page, 'admin');
+  const phonesLink = page.getByRole('link', { name: /Phones/ });
+  await expect(phonesLink.getByLabel('1 waiting')).toBeVisible();
+  await phonesLink.click();
+  await expect(page.getByRole('heading', { name: 'Phones', exact: true })).toBeVisible();
+  const request = page.getByRole('row', { name: /Kabir Joshi/ });
+  await expect(request.getByText('Redmi Note 13')).toBeVisible();
+  await expect(request.getByText('Galaxy A14')).toBeVisible();
+  await expect(request.getByText('Secure hardware')).toBeVisible();
+  await shot(page, '08b-phone-requests');
+
+  await request.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.getByText('No requests waiting')).toBeVisible();
+  await page.getByText('Linked', { exact: true }).click();
+  await expect(page.getByRole('row', { name: /Kabir Joshi/ }).getByText('Redmi Note 13')).toBeVisible();
+  await page.getByText('Replaced & unlinked').click();
+  await expect(page.getByRole('row', { name: /Kabir Joshi/ }).getByText('Replaced by a new phone')).toBeVisible();
+  await shot(page, '08c-phones-replaced');
 });
 
 test('admin imports students from a spreadsheet', async ({ page }) => {
@@ -151,15 +191,26 @@ test('teacher runs attendance; a student scans the projected code', async ({ pag
   expect(scanned).toBe(await projector.getByTestId('projector-qr').getAttribute('data-payload'));
   await projector.screenshot({ path: 'e2e/screenshots/13-projector.png' });
 
-  // ...and the student's app submits it.
+  // ...and the student's app submits it, signed by their linked phone.
   const studentLogin = await request.post(`${API}/v1/auth/login`, {
     data: { instituteCode: 'DEMO', username: '2024comp001', password: PASSWORD },
   });
   const { accessToken } = await studentLogin.json();
-  const scan = await request.post(`${API}/v1/attendance/scan`, {
-    headers: { authorization: `Bearer ${accessToken}` },
-    data: { qr: scanned },
-  });
+  const scanAs = (data: object) =>
+    request.post(`${API}/v1/attendance/scan`, { headers: { authorization: `Bearer ${accessToken}` }, data });
+  const unsigned = await scanAs({ qr: scanned });
+  expect(unsigned.status()).toBe(403);
+  expect((await unsigned.json()).error.code).toBe('DEVICE_REQUIRED');
+  let device: { id: string; signature: string } | undefined;
+  if (EXTERNAL) {
+    // No way to link a phone from here: allow unsigned scans for this one.
+    await setPhoneRequirement(request, false);
+  } else {
+    const phone = await insertPhone('2024comp001');
+    device = { id: phone.deviceId, signature: phone.sign(scanned!) };
+  }
+  const scan = await scanAs({ qr: scanned, device });
+  if (EXTERNAL) await setPhoneRequirement(request, true);
   expect(scan.status()).toBe(200);
   expect((await scan.json()).session.subject.code).toBe('CS301');
 
@@ -211,6 +262,7 @@ test('student and platform owner', async ({ page }) => {
   await signIn(page, '2024comp002');
   await expect(page).toHaveURL(/\/profile/);
   await expect(page.getByText('Computer Engineering › SY › Div A')).toBeVisible();
+  await expect(page.getByText('Sign in to the app on your phone to link it.')).toBeVisible();
   await shot(page, '18-student-profile');
   await signOut(page);
 

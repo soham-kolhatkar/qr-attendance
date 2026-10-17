@@ -9,12 +9,14 @@ export type AttendanceSettings = {
   qrRotationSeconds: number;
   qrGraceSeconds: number;
   defaultScanMinutes: number;
+  requireRegisteredPhone: boolean;
 };
 
 export const ATTENDANCE_DEFAULTS: AttendanceSettings = {
   qrRotationSeconds: 5,
   qrGraceSeconds: 10,
   defaultScanMinutes: 10,
+  requireRegisteredPhone: true,
 };
 
 export async function getAttendanceSettings(db: DbOrTx, instituteId: string): Promise<AttendanceSettings> {

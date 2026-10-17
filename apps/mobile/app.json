@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "QR Attendance",
+    "slug": "qr-attendance",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "qrattendance",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.qrattendance.student"
+    },
+    "android": {
+      "package": "com.qrattendance.student",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#4C6EF5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "# ML Kit (the QR reader inside expo-camera) finds its parts by name at run time;\n# without these the release build's shrinker removes them and scanning silently fails.\n-keep class com.google.mlkit.** { *; }\n-keep class com.google.android.gms.internal.mlkit_** { *; }\n-keep class com.google.firebase.components.** { *; }\n-keep class * implements com.google.firebase.components.ComponentRegistrar { *; }"
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "The camera reads the attendance QR code your teacher shows in class.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "./plugins/with-local-test-server"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

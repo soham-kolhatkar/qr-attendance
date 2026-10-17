@@ -52,6 +52,8 @@ export type InstituteSettings = {
     qrGraceSeconds?: number;
     /** How long QR scanning stays open after a session starts. */
     defaultScanMinutes?: number;
+    /** Scans must come from the student's linked phone (signed by its hardware key). */
+    requireRegisteredPhone?: boolean;
   };
 };
 
@@ -441,6 +443,8 @@ export const attendanceRecords = pgTable(
     reason: text('reason'),
     /** Which QR step was scanned, for audits. */
     qrStep: bigint('qr_step', { mode: 'number' }),
+    /** The linked phone that signed the scan. */
+    deviceId: uuid('device_id').references((): AnyPgColumn => devices.id, { onDelete: 'set null' }),
     ip: text('ip'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -449,5 +453,76 @@ export const attendanceRecords = pgTable(
     primaryKey({ columns: [t.sessionId, t.studentId] }),
     index('attendance_records_student_idx').on(t.studentId),
     index('attendance_records_institute_student_idx').on(t.instituteId, t.studentId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Linked phones (Feature 5)
+//
+// One phone per student, one student per phone. A phone is identified by a signing key
+// created inside its secure hardware, which never leaves the phone. The server checks
+// the hardware's attestation once, then every scan is signed with that key.
+// ---------------------------------------------------------------------------
+
+export const DEVICE_STATUSES = ['pending', 'active', 'revoked', 'rejected'] as const;
+export const devicePlatformEnum = pgEnum('device_platform', ['android', 'ios']);
+export const deviceStatusEnum = pgEnum('device_status', DEVICE_STATUSES);
+
+/** What the phone's hardware vouched for when it was linked. */
+export type DeviceAttestation = {
+  /** Where the key lives: the phone's trusted environment or a separate security chip. */
+  securityLevel: 'tee' | 'strongbox';
+  /** "verified" = the phone runs its maker's software; anything else suggests a modified (rooted) phone. */
+  bootState: 'verified' | 'self_signed' | 'unverified' | 'failed' | 'unknown';
+  bootloaderLocked: boolean | null;
+  /** e.g. 202609 for the September 2026 security patch. */
+  osPatchLevel: number | null;
+  attestationVersion: number;
+};
+
+/**
+ * pending  – a student asked to switch to this phone; an admin or HOD must approve.
+ * active   – the student's phone; scans must be signed by its key.
+ * revoked  – was active, then replaced or unlinked.
+ * rejected – a request that was turned down or superseded.
+ */
+export const devices = pgTable(
+  'devices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    platform: devicePlatformEnum('platform').notNull(),
+    status: deviceStatusEnum('status').notNull(),
+    /** The phone's public key (SubjectPublicKeyInfo, DER, base64). */
+    publicKey: text('public_key').notNull(),
+    /** SHA-256 of the public key; a key can only ever be linked once. */
+    keyHash: text('key_hash').notNull().unique(),
+    /** SHA-256 of the institute and the app's per-phone id (ANDROID_ID), to spot one phone used by two students. */
+    phoneHash: text('phone_hash').notNull(),
+    attestation: jsonb('attestation').$type<DeviceAttestation>().notNull(),
+    /** As reported by the app, for people to recognise the phone. */
+    model: text('model'),
+    osVersion: text('os_version'),
+    appVersion: text('app_version'),
+    activatedAt: timestamptz('activated_at'),
+    /** Who approved the phone; NULL when it was linked automatically. */
+    activatedBy: uuid('activated_by').references(() => users.id, { onDelete: 'set null' }),
+    endedAt: timestamptz('ended_at'),
+    endedBy: uuid('ended_by').references(() => users.id, { onDelete: 'set null' }),
+    endReason: text('end_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('devices_one_active_per_user').on(t.userId).where(sql`${t.status} = 'active'`),
+    uniqueIndex('devices_one_pending_per_user').on(t.userId).where(sql`${t.status} = 'pending'`),
+    uniqueIndex('devices_one_user_per_phone').on(t.instituteId, t.phoneHash).where(sql`${t.status} = 'active'`),
+    index('devices_institute_status_idx').on(t.instituteId, t.status, t.createdAt.desc()),
+    index('devices_user_idx').on(t.userId),
   ],
 );

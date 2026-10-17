@@ -10,7 +10,8 @@ the security design and the feature roadmap.
 apps/api      Backend API (Node 24, Fastify, PostgreSQL)    ← Features 1–3
 apps/web      Web app: admin screens, teacher sessions,     ← Feature 4
               full-screen projector QR (React, Mantine)
-apps/mobile   Student app, Expo React Native                (Feature 5)
+apps/mobile   Student app (Expo React Native, Android):       ← Feature 5
+              sign in, link the phone, scan, my attendance
 docs/         Plan and design notes
 ```
 
@@ -51,17 +52,39 @@ Div A and Div B. Each institute defines its own levels, so this is just an examp
 
 **Try it in the web app** (http://localhost:5173): sign in as `admin` to see the setup
 screens, or as `prof.sharma` → **My classes** → **Take attendance** → **Show QR on
-projector**. Scanning needs the student app (Feature 5); until then you can simulate a
-student phone in the API docs as below.
+projector**, and scan the code with the student app.
 
 **Try an attendance session through the API** (in http://localhost:3000/docs):
 1. Log in as `prof.sharma`. Find the CS301 offering with `GET /v1/offerings?mine=true`,
    then start a session with `POST /v1/sessions`, giving it that `offeringId`.
 2. `GET /v1/sessions/{id}/qr` gives the code the projector would show right now.
-3. Log in as `2024comp001` and send that code to `POST /v1/attendance/scan` within about
-   15 seconds.
+3. Scans must be signed by the student's linked phone, which only the app can do. To try
+   a scan from the API docs, sign in as `admin` and switch the requirement off with
+   `PATCH /v1/settings/attendance` `{"requireRegisteredPhone": false}`; then log in as
+   `2024comp001` and send the code to `POST /v1/attendance/scan` within about 15 seconds.
 4. As `prof.sharma`, `GET /v1/sessions/{id}/records` shows who is present.
    `POST /v1/sessions/{id}/mark` marks a student by hand; a reason is required.
+
+## Student app (Android)
+
+The app lives in `apps/mobile` with its own packages (it is not part of the npm workspaces,
+so deploying the API never installs mobile tooling).
+
+```bash
+cd apps/mobile
+npm install
+npm run typecheck
+npm run build:android            # signed APK in apps/mobile/dist (≈7 minutes the first time)
+```
+
+- The build needs the Android toolchain: `scripts/setup-android.sh` installs it.
+- The first build creates the app's **release signing key** in `~/.qr-attendance`. Back
+  that folder up: updates must be signed with the same key, and the server only accepts
+  phones running an app signed with it (`ANDROID_SIGNING_CERT_SHA256`, printed by the build).
+- `EXPO_PUBLIC_API_URL` picks the server (default: the Render test environment), and
+  `EXPO_PUBLIC_ALLOW_SERVER_CHANGE=true` builds a testing version whose sign-in screen can
+  switch servers.
+- Linking needs a real phone: emulators have no secure hardware, so the server refuses them.
 
 ## Tests
 
@@ -75,5 +98,6 @@ npm run e2e             # real-browser end-to-end tests; screenshots in apps/web
 
 The first `npm run e2e` needs a browser: `cd apps/web && npx playwright install chromium`.
 
-After changing the API, regenerate the web app's typed client with
-`npm run gen:api -w apps/web`; the web type-check then flags anything that no longer fits.
+After changing the API, regenerate the typed clients with `npm run gen:api -w apps/web`
+and `npm run gen:api --prefix apps/mobile`; the type-checks then flag anything that no
+longer fits.

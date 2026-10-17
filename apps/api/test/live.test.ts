@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
-import { as, expectStatus, login, loginStudent, setupClass, type Tokens, useTestApp } from './helpers.js';
+import { as, expectStatus, login, loginStudent, setupClass, signedScan, type Tokens, useTestApp } from './helpers.js';
 
 const ctx = useTestApp();
 
@@ -55,7 +55,7 @@ describe('live headcount stream', () => {
       expect(snapshot).toMatchObject({ event: 'snapshot', data: { id: session.id, counts: { present: 0, total: 3 } } });
 
       const qr = expectStatus(await prof.get(`/v1/sessions/${session.id}/qr`), 200).payload;
-      expectStatus(await as(ctx.app, await loginStudent(ctx.app, 'ca02')).post('/v1/attendance/scan', { qr }), 200);
+      expectStatus(await signedScan(ctx, await loginStudent(ctx.app, 'ca02'), qr), 200);
       const scanned = await stream.next();
       expect(scanned).toMatchObject({
         event: 'marked',
