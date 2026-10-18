@@ -1,3 +1,5 @@
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
@@ -355,6 +357,65 @@ test('corrections: students ask, the teacher answers, the student hears back', a
   await expect(page.getByText(/^Approved Kabir Joshi’s correction for CS301/)).toBeVisible();
   await expect(page.getByText(/^Turned down Meera Kulkarni’s correction for CS301/)).toBeVisible();
   await shot(page, '28-activity');
+});
+
+test('admin connects their ERP: an API key and a webhook', async ({ page, context, request }) => {
+  test.skip(EXTERNAL, 'Deployments refuse webhooks to this machine');
+  // The "ERP": records what it's sent.
+  const received: { type: string }[] = [];
+  const erp = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      received.push(JSON.parse(body));
+      res.writeHead(200).end();
+    });
+  });
+  await new Promise<void>((resolve) => erp.listen(0, '127.0.0.1', resolve));
+  const erpUrl = `http://127.0.0.1:${(erp.address() as AddressInfo).port}/hooks/attendance`;
+
+  try {
+    await signIn(page, 'admin');
+    await page.getByRole('link', { name: 'Integrations' }).click();
+    await expect(page.getByRole('heading', { name: 'Integrations', exact: true })).toBeVisible();
+
+    // An API key, shown once, that works straight away.
+    await page.getByRole('button', { name: 'Create API key' }).click();
+    const create = page.getByRole('dialog');
+    await create.getByLabel('Name').fill('ERP sync');
+    await create.getByLabel('Read students').check();
+    await create.getByRole('button', { name: 'Create key' }).click();
+    const key = (await page.getByTestId('secret-value').textContent())!.trim();
+    expect(key).toMatch(/^qra_/);
+    await shot(page, '29-api-key-created');
+    await page.getByRole('button', { name: 'Done' }).click();
+    const whoami = await request.get(`${API}/v1/integration/key`, { headers: { authorization: `Bearer ${key}` } });
+    expect((await whoami.json()).key).toMatchObject({ name: 'ERP sync', scopes: ['attendance:read', 'students:read'] });
+    const keyRow = page.getByRole('row', { name: /ERP sync/ });
+    await expect(keyRow.getByText('Read attendance')).toBeVisible();
+
+    // A webhook to the ERP, tested from the page.
+    await page.getByRole('tab', { name: 'Webhooks' }).click();
+    await page.getByRole('button', { name: 'Add webhook' }).click();
+    await page.getByRole('dialog').getByLabel('Address').fill(erpUrl);
+    await page.getByRole('dialog').getByLabel('Description').fill('ERP attendance sync');
+    await page.getByRole('dialog').getByRole('button', { name: 'Add webhook' }).click();
+    await expect(page.getByTestId('secret-value')).toContainText('whsec_');
+    await page.getByRole('button', { name: 'Done' }).click();
+    await page.getByRole('button', { name: 'Send test' }).click();
+    await expect(page.getByText('Test delivered: your system answered 200.')).toBeVisible();
+    expect(received.map((e) => e.type)).toEqual(['ping']);
+    await shot(page, '30-webhooks');
+
+    // The developer docs, from the same address.
+    const docs = await context.newPage();
+    await docs.goto('/docs/integration');
+    await expect(docs.getByText('QR Attendance integration API').first()).toBeVisible();
+    await expect(docs.getByText('/v1/integration/attendance').first()).toBeVisible();
+    await docs.screenshot({ path: 'e2e/screenshots/31-developer-docs.png' });
+  } finally {
+    erp.close();
+  }
 });
 
 test('HOD sees their department', async ({ page }) => {

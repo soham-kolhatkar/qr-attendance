@@ -115,6 +115,14 @@ The admin *Settings* page says which of the two are set up. Reminders go out fro
 (India time) and the staff summary on Monday mornings; the free plan sleeps when idle, so
 they go out the next time the server is awake.
 
+## Connecting an institute's own systems
+
+Admins create API keys and webhooks on the *Integrations* page; their developers read
+`<your address>/docs/integration`. Nothing needs setting up on Render. Webhooks only go
+to public HTTPS addresses (`WEBHOOK_ALLOW_PRIVATE_URLS` must stay unset here). To try a
+webhook without a system of your own, use an address from a request-inspection site such
+as webhook.site and press *Send test*.
+
 ## Checking a deployment
 
 A smoke test runs the core path against the live site with a real browser:

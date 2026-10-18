@@ -16,6 +16,7 @@ import { z } from 'zod';
 import type { Config } from './config.js';
 import type { Db } from './db/client.js';
 import { AppError } from './lib/errors.js';
+import { registerRequestContext } from './lib/request-context.js';
 import { serveWebApp } from './web.js';
 import { LiveHub } from './modules/attendance/live.js';
 import { scanRoutes, sessionRoutes, settingsRoutes } from './modules/attendance/routes.js';
@@ -42,6 +43,8 @@ import type { Delivery } from './modules/notifications/delivery.js';
 import { brevoSender, logSender } from './modules/notifications/email.js';
 import { fcmSender } from './modules/notifications/push.js';
 import { notificationRoutes } from './modules/notifications/routes.js';
+import { apiKeyRoutes, integrationDocsRoute, integrationRoutes } from './modules/integration/routes.js';
+import { webhookRoutes } from './modules/webhooks/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -91,6 +94,7 @@ export async function buildApp({
           },
   }).withTypeProvider<ZodTypeProvider>();
 
+  registerRequestContext(app);
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   app.decorate('db', db);
@@ -141,6 +145,14 @@ export async function buildApp({
     },
     transform: (data) => {
       const result = jsonSchemaTransform(data);
+      const scope = data.route.config?.apiKey;
+      if (scope) {
+        // Marks what API keys can call; the integration docs list exactly these.
+        const schema = result.schema as Record<string, unknown>;
+        schema['x-api-key-scope'] = scope;
+        const note = scope === 'any' ? 'API keys: any key.' : `API keys: needs the \`${scope}\` scope.`;
+        schema.description = schema.description ? `${String(schema.description)}\n\n${note}` : note;
+      }
       if (!data.route.config?.fileUpload) return result;
       const fileBody = {
         type: 'object',
@@ -209,6 +221,10 @@ export async function buildApp({
   await app.register(correctionRoutes, { prefix: '/v1/corrections' });
   await app.register(notificationRoutes, { prefix: '/v1/notifications' });
   await app.register(auditRoutes, { prefix: '/v1/audit' });
+  await app.register(apiKeyRoutes, { prefix: '/v1/api-keys' });
+  await app.register(webhookRoutes, { prefix: '/v1/webhooks' });
+  await app.register(integrationRoutes, { prefix: '/v1/integration' });
+  await app.register(integrationDocsRoute);
 
   return app;
 }

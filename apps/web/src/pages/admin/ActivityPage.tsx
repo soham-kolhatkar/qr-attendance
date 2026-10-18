@@ -11,7 +11,7 @@ import { formatDateTime, ROLE_LABELS } from '../../lib/format';
 
 const PAGE_SIZE = 50;
 
-type Category = 'changes' | 'attendance' | 'people' | 'phones' | 'academic' | 'settings' | 'security';
+type Category = 'changes' | 'attendance' | 'people' | 'phones' | 'academic' | 'settings' | 'integrations' | 'security';
 const CATEGORIES: { value: Category; label: string }[] = [
   { value: 'changes', label: 'All changes' },
   { value: 'attendance', label: 'Attendance' },
@@ -19,6 +19,7 @@ const CATEGORIES: { value: Category; label: string }[] = [
   { value: 'phones', label: 'Phones' },
   { value: 'academic', label: 'Classes & subjects' },
   { value: 'settings', label: 'Settings' },
+  { value: 'integrations', label: 'API keys & webhooks' },
   { value: 'security', label: 'Sign-ins & passwords' },
 ];
 

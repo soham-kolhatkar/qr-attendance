@@ -30,6 +30,7 @@ const EMAIL_MAX_AGE_MS = 3 * 24 * 3600_000;
 const EMAIL_LINKS: Partial<Record<NotificationKind, { label: string; path: string }>> = {
   'summary.weekly': { label: 'Open reports', path: '/reports' },
   'attendance.low': { label: 'See your attendance', path: '/profile' },
+  'webhook.disabled': { label: 'Open Integrations', path: '/integrations' },
 };
 
 const startOfUtcDay = (at: Date) => new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));

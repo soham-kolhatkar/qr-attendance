@@ -17,6 +17,8 @@ const config = loadConfig({
   NODE_ENV: 'test',
   DATABASE_URL: TEST_DATABASE_URL,
   JWT_SECRET: 'test-secret-that-is-definitely-long-enough',
+  // Webhook tests deliver to a receiver on this machine.
+  WEBHOOK_ALLOW_PRIVATE_URLS: 'true',
 });
 
 /**

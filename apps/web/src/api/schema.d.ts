@@ -1058,7 +1058,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Active faculty, HODs and admins (names only) */
+        /**
+         * Active faculty, HODs and admins (names only)
+         * @description API keys: needs the `staff:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -1104,7 +1107,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Levels and the full unit tree, with student counts */
+        /**
+         * Levels and the full unit tree, with student counts
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -1624,7 +1630,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List groups, optionally only those under a unit */
+        /**
+         * List groups, optionally only those under a unit
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -2062,7 +2071,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List students; filter by unit (includes units below it) or group */
+        /**
+         * List students; filter by unit (includes units below it) or group
+         * @description API keys: needs the `students:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -2116,7 +2128,10 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create a student in a class (unit), optionally with groups */
+        /**
+         * Create a student in a class (unit), optionally with groups
+         * @description API keys: needs the `students:write` scope.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -2234,7 +2249,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get one student */
+        /**
+         * Get one student
+         * @description API keys: needs the `students:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -2311,7 +2329,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Move to another class, change roll number, or replace groups */
+        /**
+         * Move to another class, change roll number, or replace groups
+         * @description API keys: needs the `students:write` scope.
+         */
         patch: {
             parameters: {
                 query?: never;
@@ -2402,7 +2423,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List terms, newest first */
+        /**
+         * List terms, newest first
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -2667,7 +2691,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List subjects; filter by owning unit (includes units below it) */
+        /**
+         * List subjects; filter by owning unit (includes units below it)
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -2967,7 +2994,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List offerings you can see */
+        /**
+         * List offerings you can see
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -3174,7 +3204,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get an offering with its current student count */
+        /**
+         * Get an offering with its current student count
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -3435,7 +3468,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The roster: every active student in the audience */
+        /**
+         * The roster: every active student in the audience
+         * @description API keys: needs the `academic:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -3803,7 +3839,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List sessions you can see, newest first */
+        /**
+         * List sessions you can see, newest first
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -4027,7 +4066,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One session with its counts */
+        /**
+         * One session with its counts
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -4276,7 +4318,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Everyone expected at the session with their status */
+        /**
+         * Everyone expected at the session with their status
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -5056,7 +5101,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Attendance settings */
+        /**
+         * Attendance settings
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -5933,7 +5981,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dashboard: overall attendance, defaulters, trend by day, by class, by subject, weekday × hour */
+        /**
+         * Dashboard: overall attendance, defaulters, trend by day, by class, by subject, weekday × hour
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -6058,7 +6109,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Attendance per student; with below=true, the defaulter list */
+        /**
+         * Attendance per student; with below=true, the defaulter list
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -6155,7 +6209,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download the student list as Excel (with a column per subject) or PDF */
+        /**
+         * Download the student list as Excel (with a column per subject) or PDF
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -6204,7 +6261,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One student's attendance by subject and session (faculty: the classes they teach) */
+        /**
+         * One student's attendance by subject and session (faculty: the classes they teach)
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -6317,7 +6377,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Attendance register for a class: every student × every session */
+        /**
+         * Attendance register for a class: every student × every session
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -6414,7 +6477,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download the attendance register as Excel or PDF */
+        /**
+         * Download the attendance register as Excel or PDF
+         * @description API keys: needs the `attendance:read` scope.
+         */
         get: {
             parameters: {
                 query?: {
@@ -7288,8 +7354,8 @@ export interface paths {
                 query?: {
                     page?: number;
                     pageSize?: number;
-                    /** @description changes: All changes; attendance: Attendance; people: Students & staff; phones: Phones; academic: Classes & subjects; settings: Settings; security: Sign-ins & passwords */
-                    category?: "changes" | "attendance" | "people" | "phones" | "academic" | "settings" | "security";
+                    /** @description changes: All changes; attendance: Attendance; people: Students & staff; phones: Phones; academic: Classes & subjects; settings: Settings; integrations: API keys & webhooks; security: Sign-ins & passwords */
+                    category?: "changes" | "attendance" | "people" | "phones" | "academic" | "settings" | "integrations" | "security";
                     /** @description Only what this person did */
                     actorId?: string;
                     entityType?: string;
@@ -7352,6 +7418,1445 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-keys/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** API keys, newest first (revoked ones too) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            /** @description The start of the key, to recognise it */
+                            prefix: string;
+                            scopes: ("students:read" | "students:write" | "staff:read" | "staff:write" | "academic:read" | "attendance:read")[];
+                            /** @enum {string} */
+                            status: "active" | "expired" | "revoked";
+                            createdBy: {
+                                /** Format: uuid */
+                                id: string;
+                                fullName: string;
+                            };
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            expiresAt: string | null;
+                            /** Format: date-time */
+                            lastUsedAt: string | null;
+                            lastUsedIp: string | null;
+                            /** Format: date-time */
+                            revokedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create an API key; the response holds the key itself, shown this once */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description What uses it, e.g. "ERP sync" */
+                        name: string;
+                        scopes: ("students:read" | "students:write" | "staff:read" | "staff:write" | "academic:read" | "attendance:read")[];
+                        /** Format: date-time */
+                        expiresAt?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            key: string;
+                            apiKey: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                /** @description The start of the key, to recognise it */
+                                prefix: string;
+                                scopes: ("students:read" | "students:write" | "staff:read" | "staff:write" | "academic:read" | "attendance:read")[];
+                                /** @enum {string} */
+                                status: "active" | "expired" | "revoked";
+                                createdBy: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    fullName: string;
+                                };
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                expiresAt: string | null;
+                                /** Format: date-time */
+                                lastUsedAt: string | null;
+                                lastUsedIp: string | null;
+                                /** Format: date-time */
+                                revokedAt: string | null;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-keys/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a key working, at once */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            /** @description The start of the key, to recognise it */
+                            prefix: string;
+                            scopes: ("students:read" | "students:write" | "staff:read" | "staff:write" | "academic:read" | "attendance:read")[];
+                            /** @enum {string} */
+                            status: "active" | "expired" | "revoked";
+                            createdBy: {
+                                /** Format: uuid */
+                                id: string;
+                                fullName: string;
+                            };
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            expiresAt: string | null;
+                            /** Format: date-time */
+                            lastUsedAt: string | null;
+                            lastUsedIp: string | null;
+                            /** Format: date-time */
+                            revokedAt: string | null;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Webhooks, with deliveries in the past day */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            url: string;
+                            description: string | null;
+                            events: ("attendance.recorded" | "session.started" | "session.closed" | "session.cancelled")[];
+                            enabled: boolean;
+                            disabledReason: string | null;
+                            /** Format: date-time */
+                            lastSuccessAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description Start of the current run of failures
+                             */
+                            failingSince: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            lastDay: {
+                                succeeded: number;
+                                failed: number;
+                                pending: number;
+                            };
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a webhook; the response holds its signing secret */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        url: string;
+                        description?: string;
+                        events: ("attendance.recorded" | "session.started" | "session.closed" | "session.cancelled")[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            endpoint: {
+                                /** Format: uuid */
+                                id: string;
+                                url: string;
+                                description: string | null;
+                                events: ("attendance.recorded" | "session.started" | "session.closed" | "session.cancelled")[];
+                                enabled: boolean;
+                                disabledReason: string | null;
+                                /** Format: date-time */
+                                lastSuccessAt: string | null;
+                                /**
+                                 * Format: date-time
+                                 * @description Start of the current run of failures
+                                 */
+                                failingSince: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                lastDay: {
+                                    succeeded: number;
+                                    failed: number;
+                                    pending: number;
+                                };
+                            };
+                            secret: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a webhook and its deliveries */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": null;
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a webhook, or switch it off and on (switching on clears its failures) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        url?: string;
+                        description?: string | null;
+                        events?: ("attendance.recorded" | "session.started" | "session.closed" | "session.cancelled")[];
+                        enabled?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            url: string;
+                            description: string | null;
+                            events: ("attendance.recorded" | "session.started" | "session.closed" | "session.cancelled")[];
+                            enabled: boolean;
+                            disabledReason: string | null;
+                            /** Format: date-time */
+                            lastSuccessAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description Start of the current run of failures
+                             */
+                            failingSince: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            lastDay: {
+                                succeeded: number;
+                                failed: number;
+                                pending: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/webhooks/{id}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show the signing secret */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Signs deliveries; keep it in the receiving system only */
+                            secret: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{id}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the signing secret (takes effect at once) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Signs deliveries; keep it in the receiving system only */
+                            secret: string;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a "ping" event now and see what the receiver answers */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok: boolean;
+                            responseStatus: number | null;
+                            error: string | null;
+                            delivery: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                eventId: string;
+                                eventType: string;
+                                /** @enum {string} */
+                                status: "pending" | "succeeded" | "failed";
+                                attempts: number;
+                                responseStatus: number | null;
+                                lastError: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                lastAttemptAt: string | null;
+                                /** Format: date-time */
+                                nextAttemptAt: string | null;
+                                /** Format: date-time */
+                                deliveredAt: string | null;
+                                payload: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deliveries to a webhook, newest first (kept for 30 days) */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                    status?: "pending" | "succeeded" | "failed";
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                eventId: string;
+                                eventType: string;
+                                /** @enum {string} */
+                                status: "pending" | "succeeded" | "failed";
+                                attempts: number;
+                                responseStatus: number | null;
+                                lastError: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                lastAttemptAt: string | null;
+                                /** Format: date-time */
+                                nextAttemptAt: string | null;
+                                /** Format: date-time */
+                                deliveredAt: string | null;
+                                payload: {
+                                    [key: string]: unknown;
+                                };
+                            }[];
+                            total: number;
+                            page: number;
+                            pageSize: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{id}/deliveries/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send every failed delivery from the past 7 days again */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            queued: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{id}/deliveries/{deliveryId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send one failed delivery again */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    deliveryId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            queued: number;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The calling API key: its institute and scopes (a quick way to test a key)
+         * @description API keys: any key.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            institute: {
+                                /** Format: uuid */
+                                id: string;
+                                code: string;
+                                name: string;
+                            };
+                            key: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                scopes: ("students:read" | "students:write" | "staff:read" | "staff:write" | "academic:read" | "attendance:read")[];
+                            } | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Change feed of attendance marks, oldest change first
+         * @description A mark appears again each time it changes. Keep the latest per session and student.
+         *
+         *     API keys: needs the `attendance:read` scope.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The cursor from the previous response */
+                    after?: string;
+                    /** @description Start from this time instead (ignored when `after` is given) */
+                    since?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                session: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    offeringId: string;
+                                    subject: {
+                                        code: string;
+                                        name: string;
+                                    };
+                                    /** @enum {string} */
+                                    kind: "lecture" | "lab" | "tutorial" | "other";
+                                    topic: string | null;
+                                    /** Format: date-time */
+                                    startedAt: string;
+                                    /**
+                                     * Format: date-time
+                                     * @description When QR scanning stops (or stopped)
+                                     */
+                                    closesAt: string;
+                                    /** @enum {string} */
+                                    status: "open" | "closed" | "cancelled";
+                                };
+                                student: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** @description Usually the enrollment number */
+                                    username: string;
+                                    fullName: string;
+                                    rollNo: string | null;
+                                };
+                                /** @enum {string} */
+                                status: "present" | "absent" | "excused";
+                                /** @enum {string|null} */
+                                method: "qr" | "manual" | null;
+                                /** Format: date-time */
+                                markedAt: string | null;
+                                /** @description Given for marks by hand */
+                                reason: string | null;
+                                /** Format: date-time */
+                                updatedAt: string;
+                            }[];
+                            /** @description Pass as `after` next time; store it between runs */
+                            cursor: string | null;
+                            /** @description More are waiting: call again straight away */
+                            hasMore: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Change feed of sessions (classes held), oldest change first
+         * @description A session appears again when it closes, is re-opened or is cancelled.
+         *
+         *     API keys: needs the `attendance:read` scope.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The cursor from the previous response */
+                    after?: string;
+                    /** @description Start from this time instead (ignored when `after` is given) */
+                    since?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                offeringId: string;
+                                subject: {
+                                    code: string;
+                                    name: string;
+                                };
+                                /** @enum {string} */
+                                kind: "lecture" | "lab" | "tutorial" | "other";
+                                topic: string | null;
+                                /** Format: date-time */
+                                startedAt: string;
+                                /**
+                                 * Format: date-time
+                                 * @description When QR scanning stops (or stopped)
+                                 */
+                                closesAt: string;
+                                /** @enum {string} */
+                                status: "open" | "closed" | "cancelled";
+                                /** Format: date-time */
+                                closedAt: string | null;
+                                cancelReason: string | null;
+                                counts: {
+                                    present: number;
+                                    absent: number;
+                                    excused: number;
+                                    total: number;
+                                };
+                                startedBy: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    fullName: string;
+                                };
+                                /** Format: date-time */
+                                updatedAt: string;
+                            }[];
+                            /** @description Pass as `after` next time; store it between runs */
+                            cursor: string | null;
+                            /** @description More are waiting: call again straight away */
+                            hasMore: boolean;
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create and update students in bulk (matched by username; all or nothing)
+         * @description API keys: needs the `students:write` scope.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Check everything without saving
+                         * @default false
+                         */
+                        dryRun?: boolean;
+                        /**
+                         * @description Create classes and batches that don’t exist yet
+                         * @default true
+                         */
+                        createMissing?: boolean;
+                        rows: {
+                            username: string;
+                            fullName: string;
+                            email?: string;
+                            phone?: string;
+                            rollNo?: string;
+                            /** @description From the top level down, e.g. ["Computer Engineering", "SY", "Div A"]. Required for new students. */
+                            class?: string[];
+                            /** @description Batches, electives…; replaces the student’s groups */
+                            groups?: string[];
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            dryRun: boolean;
+                            summary: {
+                                rows: number;
+                                create: number;
+                                update: number;
+                                unchanged: number;
+                                errors: number;
+                            };
+                            /** @description Classes that are (or would be) created */
+                            newUnits: string[];
+                            newGroups: string[];
+                            errors: {
+                                row: number;
+                                column?: string;
+                                message: string;
+                            }[];
+                            warnings: string[];
+                            /** @description After saving: temporary passwords for new accounts, returned this once */
+                            credentials?: {
+                                username: string;
+                                fullName: string;
+                                temporaryPassword: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/integration/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create and update faculty and HODs in bulk (matched by username; all or nothing)
+         * @description Roles of existing accounts are never changed. Admin accounts can’t be created or changed with an API key.
+         *
+         *     API keys: needs the `staff:write` scope.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Check everything without saving
+                         * @default false
+                         */
+                        dryRun?: boolean;
+                        /**
+                         * @description Create classes and batches that don’t exist yet
+                         * @default true
+                         */
+                        createMissing?: boolean;
+                        rows: {
+                            username: string;
+                            fullName: string;
+                            email?: string;
+                            phone?: string;
+                            /**
+                             * @description For new accounts; default faculty
+                             * @enum {string}
+                             */
+                            role?: "faculty" | "hod" | "admin";
+                            designation?: string;
+                            /** @description Department or home unit, from the top level down. Required for HODs. */
+                            unit?: string[];
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            dryRun: boolean;
+                            summary: {
+                                rows: number;
+                                create: number;
+                                update: number;
+                                unchanged: number;
+                                errors: number;
+                            };
+                            /** @description Classes that are (or would be) created */
+                            newUnits: string[];
+                            newGroups: string[];
+                            errors: {
+                                row: number;
+                                column?: string;
+                                message: string;
+                            }[];
+                            warnings: string[];
+                            /** @description After saving: temporary passwords for new accounts, returned this once */
+                            credentials?: {
+                                username: string;
+                                fullName: string;
+                                temporaryPassword: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Default Response */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                code: string;
+                                message: string;
+                                details?: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;

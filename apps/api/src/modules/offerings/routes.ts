@@ -73,6 +73,7 @@ export const offeringRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/',
     {
+      config: { apiKey: 'academic:read' },
       preHandler: staff,
       schema: {
         tags,
@@ -96,6 +97,7 @@ export const offeringRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/:id',
     {
+      config: { apiKey: 'academic:read' },
       preHandler: staff,
       schema: {
         tags,
@@ -114,6 +116,7 @@ export const offeringRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/:id/students',
     {
+      config: { apiKey: 'academic:read' },
       preHandler: staff,
       schema: {
         tags,

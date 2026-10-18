@@ -10,6 +10,7 @@ import { formatAgo } from '../lib/format';
 /** Where a notification leads on the web. */
 function target(n: NotificationItem, role: Role): string {
   if (n.kind === 'summary.weekly') return '/reports';
+  if (n.kind === 'webhook.disabled') return '/integrations';
   return role === 'student' ? '/profile' : '/';
 }
 

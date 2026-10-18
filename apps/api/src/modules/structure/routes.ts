@@ -35,6 +35,7 @@ export const structureRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/',
     {
+      config: { apiKey: 'academic:read' },
       preHandler: guard('admin', 'hod', 'faculty'),
       schema: {
         tags,

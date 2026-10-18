@@ -25,6 +25,7 @@ export const groupRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/',
     {
+      config: { apiKey: 'academic:read' },
       preHandler: guard('admin', 'hod', 'faculty'),
       schema: {
         tags,

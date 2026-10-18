@@ -274,7 +274,48 @@ bell in the app), and also:
 - On the free hosting plan the server sleeps when idle, so a reminder due at 5 pm goes out
   the next time the server is awake.
 
-## 7. Tech stack (free until the first paying client)
+## 7. Integration API
+
+Institutes connect their own systems (an ERP, a student information system, a parent
+portal). The developer guide and reference are served by the API at `/docs/integration`,
+generated from the same schemas the server validates with.
+
+**API keys.** An admin creates them on the *Integrations* page, ticking what each may do:
+read students, update students, read or update staff, read classes and subjects, read
+attendance.
+- A key is shown once; only a SHA-256 of its secret is stored. Its first part (the prefix)
+  identifies it in lists.
+- A key acts **on behalf of the admin who created it**, within its scopes. It stops working
+  when revoked or expired, or when that person is no longer an active admin. Everything it
+  changes is in the activity log, labelled with the key's name.
+- Only the endpoints listed in the integration docs accept keys (27 of them); everything
+  else, including managing keys and webhooks, refuses them. Keys can't create or change
+  admin accounts.
+- 600 requests a minute per key (`API_KEY_RATE_LIMIT`), answered with `429` and
+  `Retry-After` beyond that.
+
+**What systems can do:**
+- Read students, staff, structure, terms, subjects, offerings, sessions, marks and reports
+  through the existing endpoints.
+- Sync incrementally with two **change feeds** (`/v1/integration/attendance`,
+  `/v1/integration/sessions`): oldest change first, resumable with a cursor, complete up to
+  the cursor (changes are held back 30 seconds so none still being saved is skipped).
+- Push students and staff in bulk as JSON (`/v1/integration/students`, `/staff`), with the
+  same rules as the spreadsheet import (all or nothing, blank never erases, preview with
+  `dryRun`).
+
+**Webhooks.** An admin adds HTTPS addresses and chooses events: `attendance.recorded`
+(scan, mark by hand, approved correction), `session.started`, `session.closed` (with every
+mark) and `session.cancelled`.
+- Events are saved with the change that caused them, then a background sender delivers
+  them within a couple of seconds, signed with HMAC-SHA256 (`QRA-Signature`).
+- Failed deliveries are retried for about a day (30 s, 2 min, 10 min, 30 min, 1, 3, 6, 12 h).
+  An endpoint failing for a whole day is switched off and the admins are told; failed
+  deliveries can be sent again from the page. Deliveries are kept 30 days.
+- Requests never go to private or internal addresses (checked when connecting, after DNS),
+  and redirects aren't followed, so a webhook can't reach our hosting's internal services.
+
+## 8. Tech stack (free until the first paying client)
 
 | Part | Choice | Free hosting option |
 |---|---|---|
@@ -294,7 +335,7 @@ bell in the app), and also:
 
 Everything else stays on free tiers until a client signs.
 
-## 8. Roadmap: features, each one a review checkpoint
+## 9. Roadmap: features, each one a review checkpoint
 
 | # | Feature | Contents |
 |---|---|---|
@@ -305,7 +346,7 @@ Everything else stays on free tiers until a client signs.
 | 5 ✅ | Mobile app + device binding | Expo app (Android): login, phone linking with hardware key attestation, QR scanner, my attendance; phone change requests and approvals (web "Phones" page) |
 | 6 ✅ | Reports & dashboards | Reports page (trend, by class, by subject, weekday × hour), defaulter list with a per-institute minimum, student drill-down, class register, Excel/PDF downloads, running totals for speed at 10k students |
 | 7 ✅ | Corrections & notifications | Correction requests from the app and the web, answered by teachers/HODs/admins; notification list on the web and in the app; phone (Firebase) and email (Brevo) alerts: marks changed by hand, answers, weekly low-attendance reminders, Monday staff summary; activity-log page |
-| 8 | Integration API | Per-institute API keys, webhooks (e.g. `attendance.recorded`), published OpenAPI docs |
+| 8 ✅ | Integration API | Per-institute API keys with scopes, change feeds, bulk student/staff upserts, signed webhooks with retries (`attendance.recorded`, `session.*`), developer docs at `/docs/integration`, Integrations page |
 | 9 | Deploy & harden | Free-tier cloud deploy, CI, backups, load test (10k students / 30 parallel classes), monitoring |
 
 **Later, on request:** proof of presence (BLE / Wi-Fi / GPS / selfie), offline scan queue,
