@@ -431,6 +431,8 @@ export const attendanceSessions = pgTable(
     index('attendance_sessions_institute_started_idx').on(t.instituteId, t.startedAt.desc()),
     index('attendance_sessions_offering_started_idx').on(t.offeringId, t.startedAt.desc()),
     index('attendance_sessions_open_closes_idx').on(t.closesAt).where(sql`${t.status} = 'open'`),
+    // The integration API's change feed.
+    index('attendance_sessions_changes_idx').on(t.instituteId, t.updatedAt, t.id),
     // A teacher runs one live session at a time (also stops double-clicked "Start").
     uniqueIndex('attendance_sessions_one_open_per_creator').on(t.createdBy).where(sql`${t.status} = 'open'`),
   ],
@@ -471,6 +473,8 @@ export const attendanceRecords = pgTable(
     primaryKey({ columns: [t.sessionId, t.studentId] }),
     index('attendance_records_student_idx').on(t.studentId),
     index('attendance_records_institute_student_idx').on(t.instituteId, t.studentId),
+    // The integration API's change feed.
+    index('attendance_records_changes_idx').on(t.instituteId, t.updatedAt, t.sessionId, t.studentId),
   ],
 );
 
@@ -732,4 +736,113 @@ export const jobRuns = pgTable(
     ranAt: timestamptz('ran_at').notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.job, t.instituteId, t.period] })],
+);
+
+// ---------------------------------------------------------------------------
+// Integration API (Feature 8)
+//
+// Institutes connect their own systems (an ERP, a student information system) with
+// API keys, and hear about attendance as it happens through webhooks.
+// ---------------------------------------------------------------------------
+
+/** What an API key may do. A key acts for the admin who created it, within these scopes. */
+export const API_SCOPES = [
+  'students:read',
+  'students:write',
+  'staff:read',
+  'staff:write',
+  'academic:read',
+  'attendance:read',
+] as const;
+export type ApiScope = (typeof API_SCOPES)[number];
+
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    /** The key's public start, e.g. "qra_7k2m9x4q1wab": shown in lists, used to find the key. */
+    prefix: text('prefix').notNull().unique(),
+    /** SHA-256 of the secret part; the key itself is shown once and never stored. */
+    secretHash: text('secret_hash').notNull(),
+    scopes: text('scopes').array().$type<ApiScope[]>().notNull(),
+    /** The admin the key acts for. If they stop being an active admin, the key stops working. */
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamptz('expires_at'),
+    lastUsedAt: timestamptz('last_used_at'),
+    lastUsedIp: text('last_used_ip'),
+    revokedAt: timestamptz('revoked_at'),
+    revokedBy: uuid('revoked_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('api_keys_institute_idx').on(t.instituteId, t.createdAt.desc())],
+);
+
+export const WEBHOOK_EVENTS = ['attendance.recorded', 'session.started', 'session.closed', 'session.cancelled'] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+
+/** An address in the institute's own system that is told about events as they happen. */
+export const webhookEndpoints = pgTable(
+  'webhook_endpoints',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    url: text('url').notNull(),
+    description: text('description'),
+    events: text('events').array().$type<WebhookEvent[]>().notNull(),
+    /** Signs every delivery (HMAC-SHA256) so the receiver can check it came from us. */
+    secret: text('secret').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    /** Why it was switched off, e.g. failing for a day. */
+    disabledReason: text('disabled_reason'),
+    lastSuccessAt: timestamptz('last_success_at'),
+    /** Start of the current run of failed deliveries; NULL while deliveries succeed. */
+    failingSince: timestamptz('failing_since'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('webhook_endpoints_institute_idx').on(t.instituteId)],
+);
+
+export const WEBHOOK_DELIVERY_STATUSES = ['pending', 'succeeded', 'failed'] as const;
+export const webhookDeliveryStatusEnum = pgEnum('webhook_delivery_status', WEBHOOK_DELIVERY_STATUSES);
+
+/** One event for one endpoint: saved with the change that caused it, then sent (and retried) in the background. */
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    endpointId: uuid('endpoint_id')
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+    instituteId: uuid('institute_id')
+      .notNull()
+      .references(() => institutes.id, { onDelete: 'restrict' }),
+    /** The same for every endpoint told about one event, so receivers can ignore repeats. */
+    eventId: uuid('event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    status: webhookDeliveryStatusEnum('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    /** When it's next tried; also a lease, so two servers never send it at once. */
+    nextAttemptAt: timestamptz('next_attempt_at').notNull().defaultNow(),
+    lastAttemptAt: timestamptz('last_attempt_at'),
+    responseStatus: integer('response_status'),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+    deliveredAt: timestamptz('delivered_at'),
+  },
+  (t) => [
+    index('webhook_deliveries_due_idx').on(t.nextAttemptAt).where(sql`${t.status} = 'pending'`),
+    index('webhook_deliveries_endpoint_idx').on(t.endpointId, t.createdAt.desc()),
+    index('webhook_deliveries_created_idx').on(t.createdAt),
+  ],
 );

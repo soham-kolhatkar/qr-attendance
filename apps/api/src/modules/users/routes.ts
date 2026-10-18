@@ -29,6 +29,7 @@ export const directoryRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/staff',
     {
+      config: { apiKey: 'staff:read' },
       preHandler: guard('admin', 'hod', 'faculty'),
       schema: {
         tags,

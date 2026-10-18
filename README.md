@@ -40,6 +40,8 @@ npm run web:dev                  # web app on http://localhost:5173
 ```
 
 - Interactive API docs: http://localhost:3000/docs
+- Integration API docs (what institutes' own systems can use with an API key, and the
+  webhook events): http://localhost:3000/docs/integration
 - Demo logins (institute code `DEMO`, password `demo-pass-123`):
   - `admin` (institute admin)
   - `hod.comp` (HOD of Computer Engineering)

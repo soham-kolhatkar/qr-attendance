@@ -68,6 +68,7 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/summary',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard(...STAFF),
       schema: {
         tags,
@@ -118,6 +119,7 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/students',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard(...STAFF),
       schema: {
         tags,
@@ -142,6 +144,7 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/students/export',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard(...STAFF),
       schema: {
         tags,
@@ -168,6 +171,7 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/students/:id',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard(...STAFF),
       schema: {
         tags,
@@ -235,6 +239,7 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/offerings/:id/register',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard(...STAFF),
       schema: {
         tags,
@@ -253,6 +258,7 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/offerings/:id/register/export',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard(...STAFF),
       schema: {
         tags,

@@ -26,7 +26,7 @@ export const termRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get(
     '/',
-    { preHandler: staff, schema: { tags, security, summary: 'List terms, newest first', response: { 200: z.array(termDtoSchema) } } },
+    { config: { apiKey: 'academic:read' }, preHandler: staff, schema: { tags, security, summary: 'List terms, newest first', response: { 200: z.array(termDtoSchema) } } },
     (req) => listTerms(app.db, getInstituteAuth(req).instituteId),
   );
 
@@ -99,6 +99,7 @@ export const subjectRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/',
     {
+      config: { apiKey: 'academic:read' },
       preHandler: staff,
       schema: {
         tags,

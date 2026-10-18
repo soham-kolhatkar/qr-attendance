@@ -113,3 +113,9 @@ export function weeklySummary(input: {
     data: { termId: input.termId },
   };
 }
+
+export const webhookDisabled = (url: string, lastError: string): Message => ({
+  kind: 'webhook.disabled',
+  title: 'A webhook was switched off',
+  body: `Deliveries to ${url} failed for a whole day, so it has been switched off and nothing more is sent to it.\n\nLast error: ${lastError.slice(0, 200)}\n\nOnce the receiving system works again, switch the webhook back on under Integrations; deliveries that failed can be sent again from there.`,
+});

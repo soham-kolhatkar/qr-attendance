@@ -17,6 +17,8 @@ export const NOTIFICATION_KINDS = {
   'attendance.low': { push: true, email: true },
   /** Monday summary for teachers, HODs and admins: students below the minimum. */
   'summary.weekly': { push: false, email: true },
+  /** To admins: a webhook endpoint failed for a day and was switched off. */
+  'webhook.disabled': { push: false, email: true },
 } as const;
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
 

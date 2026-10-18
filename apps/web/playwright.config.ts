@@ -38,6 +38,8 @@ export default defineConfig({
         JWT_SECRET: 'e2e-secret-that-is-long-enough-123456',
         PORT: String(API_PORT),
         LOG_LEVEL: 'warn',
+        // The webhook test delivers to a receiver on this machine.
+        WEBHOOK_ALLOW_PRIVATE_URLS: 'true',
       },
     },
     {

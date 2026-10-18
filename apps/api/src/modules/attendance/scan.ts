@@ -4,6 +4,7 @@ import { attendanceRecords, attendanceSessions, institutes, offerings, students,
 import { AppError, badRequest, conflict } from '../../lib/errors.js';
 import type { InstituteAuthContext } from '../../plugins/auth.js';
 import { verifyScanDevice } from '../devices/service.js';
+import { emitEvents, sessionRef, studentRefs } from '../webhooks/events.js';
 import type { LiveHub } from './live.js';
 import { isQrMacValid, parseQrPayload, qrFreshness } from './qr.js';
 import { effectiveStatus, sessionCounts } from './sessions.js';
@@ -85,19 +86,44 @@ export async function scanQr(
   };
 
   // Mark present unless already present or set by hand — in one statement, so a scan
-  // racing with the teacher's manual change cannot overwrite it.
-  const [marked] = await db
-    .update(attendanceRecords)
-    .set({ status: 'present', method: 'qr', markedAt: now, markedBy: auth.userId, reason: null, qrStep: parsed.step, deviceId, ip })
-    .where(
-      and(
-        eq(attendanceRecords.sessionId, session.id),
-        eq(attendanceRecords.studentId, auth.userId),
-        ne(attendanceRecords.status, 'present'),
-        or(isNull(attendanceRecords.method), eq(attendanceRecords.method, 'qr')),
-      ),
-    )
-    .returning();
+  // racing with the teacher's manual change cannot overwrite it. Webhooks hear about it
+  // in the same transaction.
+  const marked = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(attendanceRecords)
+      .set({ status: 'present', method: 'qr', markedAt: now, markedBy: auth.userId, reason: null, qrStep: parsed.step, deviceId, ip })
+      .where(
+        and(
+          eq(attendanceRecords.sessionId, session.id),
+          eq(attendanceRecords.studentId, auth.userId),
+          ne(attendanceRecords.status, 'present'),
+          or(isNull(attendanceRecords.method), eq(attendanceRecords.method, 'qr')),
+        ),
+      )
+      .returning();
+    if (updated) {
+      await emitEvents(
+        tx,
+        auth.instituteId,
+        'attendance.recorded',
+        async () => [
+          {
+            session: sessionRef(session, row.subject, 'open'),
+            student: (await studentRefs(tx, [auth.userId])).get(auth.userId)!,
+            status: 'present' as const,
+            // A scan only ever changes an absent mark (marks by hand are never overridden).
+            previousStatus: 'absent' as const,
+            method: 'qr' as const,
+            via: 'scan' as const,
+            markedAt: now.toISOString(),
+            reason: null,
+          },
+        ],
+        now,
+      );
+    }
+    return updated;
+  });
 
   if (marked) {
     const [student] = await db

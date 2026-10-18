@@ -40,6 +40,7 @@ export const studentRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/',
     {
+      config: { apiKey: 'students:write' },
       preHandler: guard('admin'),
       schema: {
         tags,
@@ -69,6 +70,7 @@ export const studentRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/',
     {
+      config: { apiKey: 'students:read' },
       preHandler: guard('admin', 'hod'),
       schema: {
         tags,
@@ -92,6 +94,7 @@ export const studentRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/:id',
     {
+      config: { apiKey: 'students:read' },
       preHandler: guard('admin', 'hod'),
       schema: {
         tags,
@@ -110,6 +113,7 @@ export const studentRoutes: FastifyPluginAsyncZod = async (app) => {
   app.patch(
     '/:id',
     {
+      config: { apiKey: 'students:write' },
       preHandler: guard('admin'),
       schema: {
         tags,

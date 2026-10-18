@@ -4,7 +4,8 @@ import { defineConfig } from 'vite';
 // In development the API runs on :3000 (end-to-end tests point this elsewhere). Proxying
 // avoids CORS and mirrors production, where both are served from one origin or
 // VITE_API_URL points at the API.
-const proxy = { '/v1': process.env.API_PROXY_TARGET ?? 'http://localhost:3000' };
+const api = process.env.API_PROXY_TARGET ?? 'http://localhost:3000';
+const proxy = { '/v1': api, '/docs': api };
 
 export default defineConfig({
   plugins: [react()],

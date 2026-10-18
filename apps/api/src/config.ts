@@ -95,6 +95,13 @@ const envSchema = z.object({
     ctx.addIssue({ code: 'custom', message: "Must be the Firebase service account's JSON key (or that JSON base64-encoded)" });
     return z.NEVER;
   }),
+  /** Requests a minute each API key may make (per server). */
+  API_KEY_RATE_LIMIT: z.coerce.number().int().min(1).default(600),
+  /**
+   * Let webhooks call private addresses (localhost, 10.x, 192.168.x…). Off in production so
+   * that a webhook can't be pointed at the hosting provider's internal services.
+   */
+  WEBHOOK_ALLOW_PRIVATE_URLS: z.stringbool().default(false),
 }).superRefine((c, ctx) => {
   if (c.EMAIL_PROVIDER === 'brevo' && !c.BREVO_API_KEY) {
     ctx.addIssue({ code: 'custom', path: ['BREVO_API_KEY'], message: 'Required when EMAIL_PROVIDER is brevo' });

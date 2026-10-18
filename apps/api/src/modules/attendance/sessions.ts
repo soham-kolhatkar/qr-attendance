@@ -28,6 +28,7 @@ import { attendanceChanged, type ClassRef, correctionApproved } from '../notific
 import { notify } from '../notifications/service.js';
 import { instituteTimezone } from '../reports/query.js';
 import { markOfferingsStale } from '../reports/tallies.js';
+import { closedSessionData, emitEvents, sessionRef, studentRefs, subjectsOf } from '../webhooks/events.js';
 import type { LiveHub, SessionCounts } from './live.js';
 import { generateQrSecret, qrPayload, stepAt, stepEndsAt } from './qr.js';
 import { getAttendanceSettings } from './settings.js';
@@ -403,6 +404,17 @@ export async function startSession(
         data: { offeringId: offering.id, students: roster.length, scanMinutes, audience },
         ip,
       });
+      await emitEvents(
+        tx,
+        auth.instituteId,
+        'session.started',
+        async () => {
+          const [row] = await tx.select().from(attendanceSessions).where(eq(attendanceSessions.id, session!.id));
+          const subject = (await subjectsOf(tx, [offering.id])).get(offering.id)!;
+          return [{ session: sessionRef(row!, subject, 'open'), students: roster.length }];
+        },
+        now,
+      );
       return session!.id;
     })
     .catch(async (err) => {
@@ -457,6 +469,7 @@ export async function closeSession(
       entityId: sessionId,
       ip,
     });
+    await emitEvents(tx, auth.instituteId, 'session.closed', async () => [await closedSessionData(tx, updated!)], now);
     await publishSession(tx, hub, updated!, now);
   });
   return getSession(db, auth, scope, sessionId, now);
@@ -538,6 +551,16 @@ export async function cancelSession(
       data: { reason },
       ip,
     });
+    await emitEvents(
+      tx,
+      auth.instituteId,
+      'session.cancelled',
+      async () => {
+        const subject = (await subjectsOf(tx, [updated!.offeringId])).get(updated!.offeringId)!;
+        return [{ session: sessionRef(updated!, subject, 'cancelled'), reason }];
+      },
+      now,
+    );
     await publishSession(tx, hub, updated!, now);
   });
   return getSession(db, auth, scope, sessionId, now);
@@ -555,7 +578,10 @@ export async function closeExpiredSessions(db: Db, hub: LiveHub, now: Date): Pro
       tx,
       closed.map((s) => s.offeringId),
     );
-    for (const s of closed) await publishSession(tx, hub, s, now);
+    for (const s of closed) {
+      await emitEvents(tx, s.instituteId, 'session.closed', async () => [await closedSessionData(tx, s)], now);
+      await publishSession(tx, hub, s, now);
+    }
     return closed.length;
   });
 }
@@ -640,6 +666,33 @@ export async function applyMarks(
   await markOfferingsStale(tx, [s.offeringId]);
 
   const changes = before.map((r) => ({ studentId: r.studentId, from: r.status, to: input.status }));
+  const altered = before.filter((r) => r.status !== input.status);
+  if (altered.length > 0) {
+    await emitEvents(
+      tx,
+      auth.instituteId,
+      'attendance.recorded',
+      async () => {
+        const subject = (await subjectsOf(tx, [s.offeringId])).get(s.offeringId)!;
+        const session = sessionRef(s, subject, effectiveStatus(s, now));
+        const people = await studentRefs(
+          tx,
+          altered.map((r) => r.studentId),
+        );
+        return altered.map((r) => ({
+          session,
+          student: people.get(r.studentId)!,
+          status: input.status,
+          previousStatus: r.status,
+          method: 'manual' as const,
+          via: correction ? ('correction' as const) : ('teacher' as const),
+          markedAt: now.toISOString(),
+          reason: input.reason,
+        }));
+      },
+      now,
+    );
+  }
   await writeAudit(
     tx,
     correction
@@ -678,7 +731,7 @@ export async function applyMarks(
       )
       .returning({ id: attendanceCorrections.id, studentId: attendanceCorrections.studentId });
     const settledFor = new Map(settled.map((c) => [c.studentId, c.id]));
-    const changed = before.filter((r) => r.status !== input.status);
+    const changed = altered;
     if (changed.length > 0) {
       const ref = await classRef(tx, s);
       const by = await actorName(tx, auth.userId);

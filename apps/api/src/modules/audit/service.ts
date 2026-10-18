@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, inArray, like, lt, not, or, type SQL } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import {
+  apiKeys,
   attendanceCorrections,
   attendanceSessions,
   auditLogs,
@@ -13,6 +14,7 @@ import {
   terms,
   units,
   users,
+  webhookEndpoints,
 } from '../../db/schema.js';
 import { forbidden } from '../../lib/errors.js';
 import type { AuthContext } from '../../plugins/auth.js';
@@ -27,6 +29,7 @@ export const AUDIT_CATEGORIES = {
   phones: { label: 'Phones', prefixes: ['device.'] },
   academic: { label: 'Classes & subjects', prefixes: ['structure.', 'group.', 'term.', 'subject.', 'offering.'] },
   settings: { label: 'Settings', prefixes: ['settings.', 'institute.'] },
+  integrations: { label: 'API keys & webhooks', prefixes: ['api_key.', 'webhook.'] },
   security: { label: 'Sign-ins & passwords', prefixes: ['auth.', 'user.password_reset'] },
 } as const;
 export type AuditCategory = keyof typeof AUDIT_CATEGORIES;
@@ -106,7 +109,7 @@ export async function listAudit(db: Db, auth: AuthContext, query: AuditQuery): P
         id: log.id,
         createdAt: log.createdAt.toISOString(),
         action: log.action,
-        summary: describe(log, entity?.label ?? null, names, timezone),
+        summary: describe(log, entity?.label ?? null, names, timezone) + viaApiKey(log),
         actor: actor?.id ? actor : null,
         institute: institute?.id && auth.role === 'platform_admin' ? { id: institute.id, name: institute.name } : null,
         entity,
@@ -154,7 +157,7 @@ async function lookUpNames(db: Db, logs: Log[]) {
     ...deviceRows.map((d) => d.userId),
   ]);
 
-  const [userRows, sessionRows, offeringRows, subjectRows, termRows, groupRows, levelRows, instituteRows] = await Promise.all([
+  const [userRows, sessionRows, offeringRows, subjectRows, termRows, groupRows, levelRows, instituteRows, keyRows, hookRows] = await Promise.all([
     whenAny(userIds, (list) => db.select({ id: users.id, name: users.fullName }).from(users).where(inArray(users.id, list))),
     whenAny(sessionIds, (list) =>
       db
@@ -181,6 +184,8 @@ async function lookUpNames(db: Db, logs: Log[]) {
       db.select({ id: structureLevels.id, name: structureLevels.name }).from(structureLevels).where(inArray(structureLevels.id, list)),
     ),
     whenAny(uuid(ids('institute')), (list) => db.select({ id: institutes.id, name: institutes.name }).from(institutes).where(inArray(institutes.id, list))),
+    whenAny(uuid(ids('api_key')), (list) => db.select({ id: apiKeys.id, name: apiKeys.name }).from(apiKeys).where(inArray(apiKeys.id, list))),
+    whenAny(uuid(ids('webhook')), (list) => db.select({ id: webhookEndpoints.id, url: webhookEndpoints.url }).from(webhookEndpoints).where(inArray(webhookEndpoints.id, list))),
   ]);
 
   const unitIds = uuid(ids('unit'));
@@ -204,6 +209,8 @@ async function lookUpNames(db: Db, logs: Log[]) {
     ...groupRows.map((g) => [g.id, g.name] as const),
     ...levelRows.map((l) => [l.id, l.name] as const),
     ...instituteRows.map((i) => [i.id, i.name] as const),
+    ...keyRows.map((k) => [k.id, `the API key “${k.name}”`] as const),
+    ...hookRows.map((h) => [h.id, `the webhook to ${h.url}`] as const),
     ...unitPaths,
   ]);
 
@@ -280,6 +287,9 @@ const FIELD_WORDS: Record<string, string> = {
   kind: 'kind',
   parentId: 'parent',
   mustChangePassword: 'password change',
+  url: 'address',
+  events: 'events',
+  description: 'description',
 };
 
 function changedFields(data: Record<string, unknown> | null): string {
@@ -287,6 +297,12 @@ function changedFields(data: Record<string, unknown> | null): string {
   if (!changes || typeof changes !== 'object') return '';
   const words = [...new Set(Object.keys(changes).map((k) => FIELD_WORDS[k] ?? k))];
   return words.length ? ` (${words.join(', ')})` : '';
+}
+
+/** Changes made with an API key say so (the actor shown is the admin the key acts for). */
+function viaApiKey(log: Log): string {
+  const key = log.data?.viaApiKey as { name?: string } | undefined;
+  return key?.name ? ` · through the API key “${key.name}”` : '';
 }
 
 const quoted = (v: unknown) => (typeof v === 'string' ? `“${v}”` : '');
@@ -401,6 +417,24 @@ export function describe(log: Log, entity: string | null, names: Names, timezone
       return `Approved ${names.person(d.studentId) ?? 'a student'}’s correction for ${names.session(d.sessionId, timezone) ?? 'a class'}: ${String(d.from)} → ${String(d.to)}${d.note ? ` (${String(d.note)})` : ''}`;
     case 'correction.rejected':
       return `Turned down ${names.person(d.studentId) ?? 'a student'}’s correction for ${names.session(d.sessionId, timezone) ?? 'a class'}: ${String(d.note ?? '')}`;
+    case 'api_key.created':
+      return `Created the API key “${String(d.name)}” (${Array.isArray(d.scopes) ? (d.scopes as string[]).join(', ') : ''})`;
+    case 'api_key.revoked':
+      return `Revoked the API key “${String(d.name)}”`;
+    case 'webhook.created':
+      return `Added a webhook to ${String(d.url)} (${Array.isArray(d.events) ? (d.events as string[]).join(', ') : ''})`;
+    case 'webhook.updated': {
+      const hook = d.url ? `the webhook to ${String(d.url)}` : it;
+      if (changes?.enabled === false) return `Switched off ${hook}`;
+      if (changes?.enabled === true) return `Switched on ${hook}`;
+      return `Changed ${hook}${changedFields(d)}`;
+    }
+    case 'webhook.deleted':
+      return `Deleted the webhook to ${String(d.url)}`;
+    case 'webhook.secret_rotated':
+      return `Replaced the signing secret of ${d.url ? `the webhook to ${String(d.url)}` : it}`;
+    case 'webhook.disabled':
+      return `Switched off the webhook to ${String(d.url)} after a day of failed deliveries`;
     case 'correction.withdrawn':
       return `Withdrew their correction request for ${names.session(d.sessionId, timezone) ?? 'a class'}`;
     default:

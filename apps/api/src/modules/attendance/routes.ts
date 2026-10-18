@@ -106,6 +106,7 @@ export const sessionRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/',
     {
+      config: { apiKey: 'attendance:read' },
       schema: {
         tags,
         security,
@@ -129,6 +130,7 @@ export const sessionRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/:id',
     {
+      config: { apiKey: 'attendance:read' },
       schema: {
         tags,
         security,
@@ -195,6 +197,7 @@ export const sessionRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/:id/records',
     {
+      config: { apiKey: 'attendance:read' },
       schema: {
         tags,
         security,
@@ -495,6 +498,7 @@ export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/attendance',
     {
+      config: { apiKey: 'attendance:read' },
       preHandler: guard('admin', 'hod', 'faculty'),
       schema: { tags, security, summary: 'Attendance settings', response: { 200: attendanceSettingsSchema } },
     },

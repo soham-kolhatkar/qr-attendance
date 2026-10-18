@@ -6,6 +6,7 @@ import { ActivityPage } from './pages/admin/ActivityPage';
 import { CatalogPage } from './pages/admin/CatalogPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { ImportPage } from './pages/admin/ImportPage';
+import { IntegrationsPage } from './pages/admin/IntegrationsPage';
 import { OfferingsPage } from './pages/admin/OfferingsPage';
 import { PhonesPage } from './pages/admin/PhonesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
@@ -67,6 +68,7 @@ export const router = createBrowserRouter([
       { path: 'catalog', element: <RequireAuth roles={MANAGERS}><CatalogPage /></RequireAuth> },
       { path: 'offerings', element: <RequireAuth roles={MANAGERS}><OfferingsPage /></RequireAuth> },
       { path: 'settings', element: <RequireAuth roles={ADMIN}><SettingsPage /></RequireAuth> },
+      { path: 'integrations', element: <RequireAuth roles={ADMIN}><IntegrationsPage /></RequireAuth> },
       { path: 'activity', element: <RequireAuth roles={['admin', 'platform_admin']}><ActivityPage /></RequireAuth> },
       { path: 'corrections', element: <RequireAuth roles={STAFF}><CorrectionsPage /></RequireAuth> },
       { path: 'classes', element: <RequireAuth roles={STAFF}><MyClassesPage /></RequireAuth> },

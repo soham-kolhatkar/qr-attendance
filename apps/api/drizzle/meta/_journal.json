@@ -43,6 +43,13 @@
       "when": 1792266040753,
       "tag": "0005_corrections_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792305521394,
+      "tag": "0006_integration_api",
+      "breakpoints": true
     }
   ]
 }
