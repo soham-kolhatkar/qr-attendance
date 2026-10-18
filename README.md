@@ -104,6 +104,10 @@ npm run e2e             # real-browser end-to-end tests; screenshots in apps/web
 
 The first `npm run e2e` needs a browser: `cd apps/web && npx playwright install chromium`.
 
+GitHub runs all of these on every push (`.github/workflows/ci.yml`), and Render deploys
+only commits that pass. `apps/api/scripts/load-test.ts` simulates the start of a period
+at scale; its header says how to run it (never against a real deployment).
+
 After changing the API, regenerate the typed clients with `npm run gen:api -w apps/web`
 and `npm run gen:api --prefix apps/mobile`; the type-checks then flag anything that no
 longer fits.

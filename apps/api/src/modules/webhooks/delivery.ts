@@ -6,6 +6,7 @@ import { users, webhookDeliveries, webhookEndpoints } from '../../db/schema.js';
 import { writeAudit } from '../../lib/audit.js';
 import { webhookDisabled } from '../notifications/messages.js';
 import { notify } from '../notifications/service.js';
+import { forgetListeners } from './events.js';
 import { postWebhook } from './http.js';
 
 export type WebhookOptions = { allowPrivate: boolean; timeoutMs?: number };
@@ -140,6 +141,7 @@ async function disableEndpoint(db: Db, endpoint: Endpoint, lastError: string, no
       now,
     );
   });
+  forgetListeners(endpoint.instituteId);
   log?.warn({ endpointId: endpoint.id }, 'webhook endpoint switched off after a day of failures');
 }
 

@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Liveness and database connectivity */
+        /** For uptime monitors: 200 when the server, its database and its background work are all running */
         get: {
             parameters: {
                 query?: never;
@@ -30,6 +30,19 @@ export interface paths {
                         "application/json": {
                             /** @enum {string} */
                             status: "ok";
+                        };
+                    };
+                };
+                /** @description Default Response */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "error";
+                            problems: string[];
                         };
                     };
                 };
@@ -8857,6 +8870,94 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/system/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server status: version, database, background work, backlogs, recent errors */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            version: string;
+                            /** Format: date-time */
+                            startedAt: string;
+                            uptimeSeconds: number;
+                            runtime: {
+                                node: string;
+                                rssMb: number;
+                                heapUsedMb: number;
+                            };
+                            database: {
+                                ok: boolean;
+                                latencyMs: number | null;
+                                sizeMb: number | null;
+                                error: string | null;
+                            };
+                            loops: {
+                                name: string;
+                                everySeconds: number;
+                                /** Format: date-time */
+                                lastOkAt: string | null;
+                                /** Format: date-time */
+                                lastErrorAt: string | null;
+                                lastError: string | null;
+                                stalled: boolean;
+                            }[];
+                            backlog: {
+                                /** @description Waiting to be emailed or pushed */
+                                notifications: number;
+                                /** @description Webhook deliveries waiting (including retries) */
+                                webhooks: number;
+                                /** Format: date-time */
+                                oldestWebhookAt: string | null;
+                                /** @description Classes whose report totals are waiting to be recounted */
+                                staleOfferings: number;
+                            } | null;
+                            totals: {
+                                institutes: number;
+                                activeUsers: number;
+                                sessionsLastDay: number;
+                            } | null;
+                            channels: {
+                                email: boolean;
+                                push: boolean;
+                                alertEmails: boolean;
+                            };
+                            errors: {
+                                /** Format: date-time */
+                                at: string;
+                                where: string;
+                                message: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;

@@ -5,7 +5,8 @@ import { createDb } from './client.js';
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../../drizzle', import.meta.url));
 
 export async function runMigrations(databaseUrl: string): Promise<void> {
-  const { db, pool } = createDb(databaseUrl);
+  // Building an index on a big table can take minutes: no statement time limit here.
+  const { db, pool } = createDb(databaseUrl, 1, { statementTimeoutMs: 0 });
   try {
     await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
   } finally {

@@ -27,14 +27,26 @@ export const ATTENDANCE_DEFAULTS: AttendanceSettings = {
   weeklyStaffSummary: true,
 };
 
+/**
+ * Settings are read on almost every request and change rarely, so each server keeps them
+ * for a few seconds. A change made on this server applies at once; others see it within
+ * SETTINGS_TTL_MS.
+ */
+const SETTINGS_TTL_MS = 10_000;
+const cache = new Map<string, { at: number; settings: AttendanceSettings }>();
+
 export async function getAttendanceSettings(db: DbOrTx, instituteId: string): Promise<AttendanceSettings> {
+  const cached = cache.get(instituteId);
+  if (cached && Date.now() - cached.at < SETTINGS_TTL_MS) return cached.settings;
   const [row] = await db
     .select({ settings: institutes.settings })
     .from(institutes)
     .where(eq(institutes.id, instituteId))
     .limit(1);
   if (!row) throw notFound('Institute');
-  return { ...ATTENDANCE_DEFAULTS, ...row.settings.attendance };
+  const settings = { ...ATTENDANCE_DEFAULTS, ...row.settings.attendance };
+  cache.set(instituteId, { at: Date.now(), settings });
+  return settings;
 }
 
 export async function updateAttendanceSettings(
@@ -63,5 +75,5 @@ export async function updateAttendanceSettings(
       ip,
     });
     return { ...ATTENDANCE_DEFAULTS, ...attendance };
-  });
+  }).finally(() => cache.delete(auth.instituteId));
 }

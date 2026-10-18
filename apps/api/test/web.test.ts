@@ -39,6 +39,10 @@ describe('serving the web app', () => {
       expect(res.headers['content-type']).toContain('text/html');
       expect(res.headers['cache-control']).toBe('no-cache');
       expect(res.body).toContain('<div id="root">');
+      // Only the app's own scripts may run, and it can't be framed by another site.
+      expect(res.headers['content-security-policy']).toContain("script-src 'self'");
+      expect(res.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
     }
   });
 

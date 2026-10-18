@@ -3,6 +3,24 @@ import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
+/**
+ * What the web app's pages may load: only its own scripts (no inline ones, so injected
+ * markup can't run code), styles including inline style attributes (the UI library sets
+ * some), and API calls to its own address. It can't be shown inside another site's frame.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 /** Paths that belong to the API, never to the web app. */
 const API_PREFIXES = ['/v1/', '/docs', '/health'];
 
@@ -40,6 +58,7 @@ export async function serveWebApp(
       .header('x-content-type-options', 'nosniff')
       .header('referrer-policy', 'same-origin')
       .header('x-frame-options', 'DENY')
+      .header('content-security-policy', CONTENT_SECURITY_POLICY)
       .send(indexHtml);
 
   // "/" is the dist folder itself, which the static plugin refuses to list.

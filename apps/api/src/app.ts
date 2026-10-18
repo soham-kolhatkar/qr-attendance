@@ -45,6 +45,8 @@ import { fcmSender } from './modules/notifications/push.js';
 import { notificationRoutes } from './modules/notifications/routes.js';
 import { apiKeyRoutes, integrationDocsRoute, integrationRoutes } from './modules/integration/routes.js';
 import { webhookRoutes } from './modules/webhooks/routes.js';
+import { errorText, Monitor } from './modules/system/monitor.js';
+import { systemRoutes } from './modules/system/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -58,6 +60,8 @@ declare module 'fastify' {
     attestation: AndroidAttestationPolicy;
     /** How notifications reach people by email and push (null channels aren't set up). */
     delivery: Delivery;
+    /** Recent errors and background-loop health, in memory (see modules/system/monitor.ts). */
+    monitor: Monitor;
   }
   interface FastifyContextConfig {
     /**
@@ -85,6 +89,8 @@ export async function buildApp({
 }) {
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
+    // One line per request (below) instead of Fastify's two: logging was a tenth of the CPU under load.
+    disableRequestLogging: true,
     logger:
       config.NODE_ENV === 'test'
         ? false
@@ -100,6 +106,7 @@ export async function buildApp({
   app.decorate('db', db);
   app.decorate('config', config);
   app.decorate('now', () => new Date(clock()));
+  app.decorate('monitor', new Monitor());
   const listenUrl = config.DATABASE_LISTEN_URL ?? config.DATABASE_URL;
   if (new URL(listenUrl).hostname.includes('-pooler')) {
     app.log.warn('Live updates need a direct database connection, not a pooled one: set DATABASE_LISTEN_URL');
@@ -164,6 +171,20 @@ export async function buildApp({
   });
   await app.register(swaggerUi, { routePrefix: '/docs' });
 
+  app.addHook('onResponse', async (req, reply) => {
+    const entry = { method: req.method, url: req.url.split('?')[0], status: reply.statusCode, ms: Math.round(reply.elapsedTime) };
+    if (reply.statusCode >= 500) req.log.error(entry, 'request failed');
+    else if (reply.elapsedTime > 2000) req.log.warn(entry, 'slow request');
+    else req.log.info(entry, 'request');
+  });
+
+  // Every response: browsers mustn't guess content types; in production, HTTPS only
+  // (the hosting platform terminates TLS, so this header has to come from here).
+  app.addHook('onSend', async (_req, reply) => {
+    reply.header('x-content-type-options', 'nosniff');
+    if (config.NODE_ENV === 'production') reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');
+  });
+
   app.setErrorHandler(errorHandler);
   const webFallback = config.SERVE_WEB ? await serveWebApp(app, config.WEB_DIST_DIR) : null;
   app.setNotFoundHandler((req, reply) => {
@@ -176,12 +197,21 @@ export async function buildApp({
     {
       schema: {
         tags: ['system'],
-        summary: 'Liveness and database connectivity',
-        response: { 200: z.object({ status: z.literal('ok') }) },
+        summary: 'For uptime monitors: 200 when the server, its database and its background work are all running',
+        response: {
+          200: z.object({ status: z.literal('ok') }),
+          503: z.object({ status: z.literal('error'), problems: z.array(z.string()) }),
+        },
       },
     },
-    async () => {
-      await db.execute(sql`select 1`);
+    async (_req, reply) => {
+      const problems = app.monitor.stalled().map((name) => `background work stalled: ${name}`);
+      try {
+        await db.execute(sql`select 1`);
+      } catch (err) {
+        problems.unshift(`database unreachable: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      if (problems.length) return reply.code(503).send({ status: 'error' as const, problems });
       return { status: 'ok' as const };
     },
   );
@@ -225,6 +255,7 @@ export async function buildApp({
   await app.register(webhookRoutes, { prefix: '/v1/webhooks' });
   await app.register(integrationRoutes, { prefix: '/v1/integration' });
   await app.register(integrationDocsRoute);
+  await app.register(systemRoutes, { prefix: '/v1/platform/system' });
 
   return app;
 }
@@ -252,5 +283,6 @@ function errorHandler(err: FastifyError, req: FastifyRequest, reply: FastifyRepl
     return reply.code(err.statusCode).send({ error: { code: err.code ?? 'BAD_REQUEST', message: err.message } });
   }
   req.log.error(err);
+  req.server.monitor.recordError(`${req.method} ${req.routeOptions.url ?? req.url.split('?')[0]}`, errorText(err));
   return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } });
 }

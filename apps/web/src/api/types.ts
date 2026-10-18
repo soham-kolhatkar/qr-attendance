@@ -59,3 +59,4 @@ export type ApiScope = ApiKey['scopes'][number];
 export type WebhookEndpoint = Ok<'/v1/webhooks/', 'get'>[number];
 export type WebhookEvent = WebhookEndpoint['events'][number];
 export type WebhookDelivery = Ok<'/v1/webhooks/{id}/deliveries', 'get'>['items'][number];
+export type SystemStatus = Ok<'/v1/platform/system/', 'get'>;

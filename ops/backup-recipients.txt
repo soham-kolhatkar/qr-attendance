@@ -1,0 +1,3 @@
+# Backups are encrypted for this public key (docs/DEPLOY.md, Backups). Its private key
+# is kept off GitHub, in ~/.qr-attendance/backup-key.txt on the owner's computer.
+age12ahltgqp4juxjy8np3rnfwgznwdc83f0krcu3chjkljp0967gvks0n4lpt

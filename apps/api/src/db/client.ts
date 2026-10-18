@@ -21,8 +21,18 @@ export function connectionConfig(databaseUrl: string): pg.ClientConfig {
   return { connectionString: url.toString(), enableChannelBinding };
 }
 
-export function createDb(databaseUrl: string, poolMax = 10): { db: Db; pool: pg.Pool } {
-  const pool = new pg.Pool({ ...connectionConfig(databaseUrl), max: poolMax });
+/**
+ * A connection pool. Statements that run longer than `statementTimeoutMs` are stopped by
+ * the database, and a connection left idle inside a transaction is closed, so one stuck
+ * request can't hold rows or connections for ever. 0 turns the limits off (migrations).
+ */
+export function createDb(
+  databaseUrl: string,
+  poolMax = 10,
+  { statementTimeoutMs = 30_000 }: { statementTimeoutMs?: number } = {},
+): { db: Db; pool: pg.Pool } {
+  const limits = statementTimeoutMs > 0 ? { statement_timeout: statementTimeoutMs, idle_in_transaction_session_timeout: 2 * statementTimeoutMs } : {};
+  const pool = new pg.Pool({ ...connectionConfig(databaseUrl), ...limits, max: poolMax });
   // The server may close idle connections (restart, maintenance, a hosted database
   // scaling to zero). Without a listener that error would crash the process; the pool
   // simply opens a new connection on next use.

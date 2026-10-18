@@ -19,6 +19,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { InstitutesPage } from './pages/platform/InstitutesPage';
+import { SystemPage } from './pages/platform/SystemPage';
 import { RegisterPage } from './pages/reports/RegisterPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { ProfilePage } from './pages/student/ProfilePage';
@@ -76,6 +77,7 @@ export const router = createBrowserRouter([
       { path: 'sessions/:id', element: <RequireAuth roles={STAFF}><SessionPage /></RequireAuth> },
       { path: 'reports', element: <RequireAuth roles={STAFF}><ReportsPage /></RequireAuth> },
       { path: 'reports/offerings/:id', element: <RequireAuth roles={STAFF}><RegisterPage /></RequireAuth> },
+      { path: 'platform/system', element: <RequireAuth roles={['platform_admin']}><SystemPage /></RequireAuth> },
       { path: 'platform/institutes', element: <RequireAuth roles={['platform_admin']}><InstitutesPage /></RequireAuth> },
       { path: 'profile', element: <ProfilePage /> },
       { path: '*', element: <NotFoundPage /> },

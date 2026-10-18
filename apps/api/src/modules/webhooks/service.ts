@@ -6,6 +6,7 @@ import { writeAudit } from '../../lib/audit.js';
 import { badRequest, notFound } from '../../lib/errors.js';
 import type { InstituteAuthContext } from '../../plugins/auth.js';
 import { type AttemptResult, attemptDelivery, type WebhookOptions } from './delivery.js';
+import { forgetListeners } from './events.js';
 import { parseWebhookUrl } from './http.js';
 
 type EndpointRow = typeof webhookEndpoints.$inferSelect;
@@ -106,6 +107,7 @@ export async function createEndpoint(
     });
     return created!;
   });
+  forgetListeners(auth.instituteId);
   const [endpoint] = await toDtos(db, [row], now);
   return { endpoint: endpoint!, secret };
 }
@@ -147,6 +149,7 @@ export async function updateEndpoint(
     });
     return updated!;
   });
+  forgetListeners(auth.instituteId);
   const [endpoint] = await toDtos(db, [row], now);
   return endpoint!;
 }
@@ -165,6 +168,7 @@ export async function deleteEndpoint(db: Db, auth: InstituteAuthContext, id: str
       ip,
     });
   });
+  forgetListeners(auth.instituteId);
 }
 
 export async function revealSecret(db: Db, auth: InstituteAuthContext, id: string): Promise<string> {

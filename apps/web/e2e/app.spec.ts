@@ -441,6 +441,10 @@ test('student and platform owner', async ({ page }) => {
   await expect(page).toHaveURL(/\/platform\/institutes/);
   await expect(page.getByRole('cell', { name: 'Demo Institute of Technology' })).toBeVisible();
   await shot(page, '19-platform-institutes');
+  await page.getByRole('link', { name: 'System' }).click();
+  await expect(page.getByText('Everything is running')).toBeVisible();
+  await expect(page.getByText('Webhook deliveries', { exact: true })).toBeVisible();
+  await shot(page, '32-platform-system');
 });
 
 test('new account must choose a password first', async ({ page, request }) => {

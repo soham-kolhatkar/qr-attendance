@@ -7,6 +7,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, errorCode, errorMessage, unwrap } from '@/api/client';
 import { attendanceQueryKey } from '@/api/queries';
+import type { MyAttendance } from '@/api/types';
 import type { ScanResult } from '@/api/types';
 import { useMe } from '@/auth/AuthContext';
 import { formatTime } from '@/lib/format';
@@ -65,7 +66,23 @@ export default function ScanScreen() {
       const result = unwrap(await api().POST('/v1/attendance/scan', { body: { qr: data, device: proof } }));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setState({ kind: 'done', result });
-      void queryClient.invalidateQueries({ queryKey: attendanceQueryKey });
+      // Show the class as present straight away. Reloading the whole attendance screen after
+      // every scan doubled the requests at the busiest moment (the start of each period);
+      // it reloads when the student pulls down or opens the app again. Only a class the
+      // screen doesn’t list yet needs a reload now.
+      const listed = queryClient.getQueryData<MyAttendance>(attendanceQueryKey)?.recent.some((r) => r.sessionId === result.session.id);
+      if (listed) {
+        queryClient.setQueryData<MyAttendance>(attendanceQueryKey, (data) =>
+          data && {
+            ...data,
+            recent: data.recent.map((r) =>
+              r.sessionId === result.session.id ? { ...r, status: 'present', method: 'qr', canRequest: [] } : r,
+            ),
+          },
+        );
+      } else {
+        void queryClient.invalidateQueries({ queryKey: attendanceQueryKey });
+      }
     } catch (err) {
       const code = errorCode(err);
       refused.current.add(data);

@@ -315,7 +315,26 @@ mark) and `session.cancelled`.
 - Requests never go to private or internal addresses (checked when connecting, after DNS),
   and redirects aren't followed, so a webhook can't reach our hosting's internal services.
 
-## 8. Tech stack (free until the first paying client)
+## 8. Operations
+
+- **Checks before every deploy:** GitHub Actions runs all tests (200+ API tests against a
+  real Postgres, browser tests, type checks of server, web and app) and a security audit
+  of production packages on every push; Render deploys only commits that pass.
+- **Backups:** Neon's point-in-time recovery, plus a nightly logical backup that is
+  restored into a scratch database to prove it, encrypted (age) for a key kept off
+  GitHub, and kept 30 days. Restore script: `scripts/restore-backup.sh`.
+- **Monitoring:** `/health` (database and background work), a System page for the platform
+  owner, and alert emails (`ALERT_EMAIL`), which don't depend on the database.
+- **Hardening:** database statement time limits, a content security policy and HSTS,
+  one log line per request.
+- **Capacity:** measured with `apps/api/scripts/load-test.ts`. 2,000 students scanning
+  within 90 seconds (30 classes) on 0.5 CPU: typical answer 10 ms, 95% within 0.6 s; 10,000
+  on 1 CPU: 95% within 2.6 s, nothing lost. Making the scan path lean (prepared queries,
+  6 database round trips instead of 10, no transaction unless a webhook listens, the app
+  updating its screen instead of reloading) took the 0.5 CPU case from 9.5 s to 0.6 s at
+  the 95th percentile. Details: docs/DEPLOY.md, *How much server is needed*.
+
+## 9. Tech stack (free until the first paying client)
 
 | Part | Choice | Free hosting option |
 |---|---|---|
@@ -335,7 +354,7 @@ mark) and `session.cancelled`.
 
 Everything else stays on free tiers until a client signs.
 
-## 9. Roadmap: features, each one a review checkpoint
+## 10. Roadmap: features, each one a review checkpoint
 
 | # | Feature | Contents |
 |---|---|---|
@@ -347,7 +366,7 @@ Everything else stays on free tiers until a client signs.
 | 6 ✅ | Reports & dashboards | Reports page (trend, by class, by subject, weekday × hour), defaulter list with a per-institute minimum, student drill-down, class register, Excel/PDF downloads, running totals for speed at 10k students |
 | 7 ✅ | Corrections & notifications | Correction requests from the app and the web, answered by teachers/HODs/admins; notification list on the web and in the app; phone (Firebase) and email (Brevo) alerts: marks changed by hand, answers, weekly low-attendance reminders, Monday staff summary; activity-log page |
 | 8 ✅ | Integration API | Per-institute API keys with scopes, change feeds, bulk student/staff upserts, signed webhooks with retries (`attendance.recorded`, `session.*`), developer docs at `/docs/integration`, Integrations page |
-| 9 | Deploy & harden | Free-tier cloud deploy, CI, backups, load test (10k students / 30 parallel classes), monitoring |
+| 9 ✅ | Deploy & harden | CI gating deploys, nightly encrypted backups with restore checks, load test and speed-ups (10k students / 30 parallel classes), System page, health checks and alert emails, security headers |
 
 **Later, on request:** proof of presence (BLE / Wi-Fi / GPS / selfie), offline scan queue,
 parent role, desktop wrapper for the faculty screen (Tauri), SSO.

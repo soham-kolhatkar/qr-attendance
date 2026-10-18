@@ -67,7 +67,14 @@ owner account exists. Free services have no shell, so this is automatic.
 
 ## Updating
 
-Every push to `master` redeploys automatically. Data in the database is kept.
+Every push to `master` is checked first: GitHub runs every test (server, web app with a
+real browser, phone app types) and a security audit of the packages the server uses,
+about 6 minutes. Render deploys the push **only when all of that passes**
+(`autoDeployTrigger: checksPass` in `render.yaml`), so a broken change never reaches the
+site. Data in the database is kept across deploys.
+
+To see a check: GitHub → the repository → *Actions*. A red cross means the push wasn't
+deployed; the run says which test failed, and *browser-tests* holds its screenshots.
 
 ## The student app and this server
 
@@ -146,9 +153,10 @@ cd apps/web && E2E_BASE_URL=https://<your-app>.onrender.com npx playwright test 
   before class. A paid instance never sleeps.
 - **The database pauses too.** Neon suspends after 5 idle minutes and resumes in about a
   second on the next query. You won't notice it next to Render's wake-up.
-- **Neon free allowances:** 1 GB storage (plenty for testing; years of attendance for a
-  small institute fit in well under that), 100 compute-hours a month, 5 GB transfer a
-  month, and 6 hours of point-in-time recovery. Going over a limit doesn't delete data.
+- **Neon free allowances:** 0.5 GB storage, 100 compute-hours a month (a small database
+  running about 400 hours), 5 GB transfer a month, and 6 hours of point-in-time recovery.
+  Each attendance mark takes about 440 bytes, so 0.5 GB holds roughly one term for 4,000
+  students; the System page shows the size. Going over a limit doesn't delete data.
 - **Render free allowances:** 750 running hours a month (enough for one service all
   month), plus limited bandwidth and build minutes. Render suspends free services that
   run out until the next month.
@@ -157,7 +165,80 @@ cd apps/web && E2E_BASE_URL=https://<your-app>.onrender.com npx playwright test 
   deployment, set `SEED_DEMO` to `false` (Render → service → Environment).
 
 **For a real institute:** move the Render service to a paid instance (no sleeping), move
-Neon to a paid plan (longer recovery history, more compute), and turn the demo off.
+Neon to a paid plan (longer recovery history, more compute), and turn the demo off. How
+big an instance: see *How much server is needed* below.
+
+## How much server is needed
+
+Measured with `apps/api/scripts/load-test.ts`: every class starts at the same moment and
+its students scan within 90 seconds, most of them in the first half minute (harsher than
+real life). Each student's app also reloads their attendance, three admins refresh the
+dashboard every 10 seconds, and every teacher has the live screen open. The server ran with
+the CPU of each Render plan; the database was local. Times are how long students wait for
+"present".
+
+| Render plan (CPU) | 30 classes × 66 students (≈2,000 scans) | 30 classes × 334 students (≈10,000 scans) |
+|---|---|---|
+| Free (0.1) | Overloaded: waits of 25 s or more, a quarter of the codes expire before they arrive | — |
+| Starter, $7/month (0.5) | Typical 0.01 s; 95% within 0.6 s; nothing lost | Overloaded: waits of several seconds, a few codes expire |
+| Standard, $25/month (1) | — | Typical 0.01 s; 95% within 2.6 s; all 10,020 recorded |
+
+So: the free plan is for trying the product with a class or two. A college whose busiest
+period has up to ~2,000 students scanning at once runs well on **Starter**. For more,
+use **Standard**, or two Starter instances (Render → service → *Scaling*): the server
+keeps nothing to itself, so instances share the work, including the live screens.
+
+With a hosted database each request also waits about a millisecond per query for the
+network, so expect a little more; the database plan matters too (Neon's free compute is
+small; a paid plan lets it grow under load).
+
+## Backups
+
+Three layers, from quickest to most independent:
+
+1. **Neon's point-in-time recovery:** back to any moment in the last 6 hours (free plan;
+   7–30 days on paid plans), in Neon's console. For "someone deleted the wrong thing an
+   hour ago".
+2. **Nightly encrypted backups on GitHub:** at 2 am India time, *Actions → Database backup*
+   copies the whole database, restores the copy into a scratch database to prove it works,
+   encrypts it and keeps it for 30 days. The repository is public, so the file is
+   encrypted for a key that only you have: `~/.qr-attendance/backup-key.txt`.
+3. **Your own copy of `~/.qr-attendance`**, which holds that key, the app's signing key and
+   the Firebase file. Keep it in a password manager or on a USB drive as well as on this
+   computer: without it the backups can't be opened and the app can't be updated.
+
+**One-time setup:** GitHub → the repository → *Settings → Secrets and variables → Actions →
+New repository secret*: name `BACKUP_DATABASE_URL`, value Neon's direct connection string
+(the same as Render's `DATABASE_URL`). Then *Actions → Database backup → Run workflow* once
+to check: a green tick and a `database-backup-<date>` file on the run's page.
+
+**Restoring** (into an empty database: a new Neon project or branch, or a local one):
+
+```bash
+# download and unzip the backup file from the workflow run's page, then:
+scripts/restore-backup.sh qr-attendance-2026-10-18.dump.age 'postgres://…new empty database…'
+```
+
+It needs Docker and `age` (`~/opt/age/age` on this computer). Then point Render's
+`DATABASE_URL` at the restored database. Practise this now and then: a backup is only as
+good as the last time it was restored (the nightly job checks that part automatically).
+
+## Monitoring
+
+- **System page** (platform owner → *System*): whether the database and the background work
+  (closing sessions, report totals, notifications, reminders, webhooks) are running, the
+  database size, what's waiting to be sent, and the latest server errors.
+- **Alert emails:** set `ALERT_EMAIL` on Render (your address; several separated by commas).
+  Server errors and stalled background work are emailed there, at most once an hour.
+  This needs email set up (Brevo) but not the database, so it also reports the database
+  being down.
+- **Uptime:** `<your address>/health` answers 200 when the server, its database and its
+  background work are fine, and 503 with the problem otherwise. On a paid plan, point a
+  free monitor such as UptimeRobot at it (every 5 minutes) to be emailed when the whole
+  site is down. Not on the free plan: the checks would keep the service and the database
+  awake all month and use up Neon's free compute hours.
+- **Logs:** Render → service → *Logs*: one line per request (method, path, status, time),
+  slow requests (over 2 s) as warnings, errors in full.
 
 ## If something goes wrong
 
@@ -169,6 +250,9 @@ Neon to a paid plan (longer recovery history, more compute), and turn the demo o
 | `Live updates need a direct database connection` | The Neon URL is the pooled one; use the direct one (no `-pooler`) |
 | The laptop check says `could not reach the database (ETIMEDOUT)` | Your network blocks database port 5432 (common on office networks). Render is not affected; to check from the laptop, use another network such as a phone hotspot |
 | Page says the service is waking up | Normal after 15 idle minutes; wait about a minute |
+| A push didn't deploy | Its checks failed: GitHub → *Actions* says which test. Fix and push again |
+| *Database backup* failed: "Add the BACKUP_DATABASE_URL secret" | See *Backups*, one-time setup |
+| Render's *Events* say the health check failed | The System page (or `/health`) names the problem: database unreachable, or background work stalled |
 | `Invalid environment configuration` mentioning `FCM_SERVICE_ACCOUNT` | Paste the Firebase key file's whole contents, starting with `{` |
 | `notification delivery problem` … `Brevo 401` | `BREVO_API_KEY` is wrong or was deleted in Brevo |
 | `notification delivery problem` … `Brevo 400` … sender | `EMAIL_FROM` isn't a sender verified in Brevo |

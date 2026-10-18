@@ -386,15 +386,10 @@ export async function startSession(
         })
         .returning({ id: attendanceSessions.id });
 
-      for (let i = 0; i < roster.length; i += 1000) {
-        await tx.insert(attendanceRecords).values(
-          roster.slice(i, i + 1000).map((s) => ({
-            sessionId: session!.id,
-            studentId: s.id,
-            instituteId: auth.instituteId,
-          })),
-        );
-      }
+      // One array parameter rather than three per student: far less to build and send.
+      await tx.execute(sql`
+        insert into ${attendanceRecords} (session_id, student_id, institute_id)
+        select ${session!.id}::uuid, unnest(${`{${roster.map((s) => s.id).join(',')}}`}::uuid[]), ${auth.instituteId}::uuid`);
       await writeAudit(tx, {
         instituteId: auth.instituteId,
         actorUserId: auth.userId,

@@ -1,13 +1,14 @@
-import { and, eq, ne, or, isNull } from 'drizzle-orm';
-import type { Db } from '../../db/client.js';
+import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
+import type { Db, DbOrTx } from '../../db/client.js';
 import { attendanceRecords, attendanceSessions, institutes, offerings, students, subjects, users } from '../../db/schema.js';
 import { AppError, badRequest, conflict } from '../../lib/errors.js';
+import { prepared } from '../../lib/prepared.js';
 import type { InstituteAuthContext } from '../../plugins/auth.js';
 import { verifyScanDevice } from '../devices/service.js';
-import { emitEvents, sessionRef, studentRefs } from '../webhooks/events.js';
+import { emitEvents, listeningTo, sessionRef, studentRefs } from '../webhooks/events.js';
 import type { LiveHub } from './live.js';
 import { isQrMacValid, parseQrPayload, qrFreshness } from './qr.js';
-import { effectiveStatus, sessionCounts } from './sessions.js';
+import { effectiveStatus } from './sessions.js';
 import { ATTENDANCE_DEFAULTS } from './settings.js';
 
 export type ScanResult = {
@@ -17,6 +18,43 @@ export type ScanResult = {
   markedAt: string;
   session: { id: string; kind: string; startedAt: string; subject: { code: string; name: string } };
 };
+
+const scanSessionQuery = prepared((db) =>
+  db
+    .select({
+      session: attendanceSessions,
+      subject: { code: subjects.code, name: subjects.name },
+      settings: institutes.settings,
+    })
+    .from(attendanceSessions)
+    .innerJoin(offerings, eq(offerings.id, attendanceSessions.offeringId))
+    .innerJoin(subjects, eq(subjects.id, offerings.subjectId))
+    .innerJoin(institutes, eq(institutes.id, attendanceSessions.instituteId))
+    .where(and(eq(attendanceSessions.id, sql.placeholder('sessionId')), eq(attendanceSessions.instituteId, sql.placeholder('instituteId'))))
+    .limit(1)
+    .prepare('scan_session'),
+);
+
+/** The student's name and the session's counts, for the live screens. */
+const afterScanQuery = prepared((db) => {
+  const count = (status?: string) =>
+    sql<number>`(select count(*) from ${attendanceRecords} where ${attendanceRecords.sessionId} = ${sql.placeholder('sessionId')}${
+      status ? sql` and ${attendanceRecords.status} = ${sql.raw(`'${status}'`)}` : sql``
+    })`.mapWith(Number);
+  return db
+    .select({
+      fullName: users.fullName,
+      rollNo: students.rollNo,
+      present: count('present'),
+      absent: count('absent'),
+      excused: count('excused'),
+      total: count(),
+    })
+    .from(users)
+    .innerJoin(students, eq(students.userId, users.id))
+    .where(eq(users.id, sql.placeholder('studentId')))
+    .prepare('scan_after');
+});
 
 const invalidQr = () => badRequest('QR_INVALID', 'This is not a valid attendance QR code for your institute');
 
@@ -44,18 +82,7 @@ export async function scanQr(
   const parsed = parseQrPayload(qr);
   if (!parsed) throw invalidQr();
 
-  const [row] = await db
-    .select({
-      session: attendanceSessions,
-      subject: { code: subjects.code, name: subjects.name },
-      settings: institutes.settings,
-    })
-    .from(attendanceSessions)
-    .innerJoin(offerings, eq(offerings.id, attendanceSessions.offeringId))
-    .innerJoin(subjects, eq(subjects.id, offerings.subjectId))
-    .innerJoin(institutes, eq(institutes.id, attendanceSessions.instituteId))
-    .where(and(eq(attendanceSessions.id, parsed.sessionId), eq(attendanceSessions.instituteId, auth.instituteId)))
-    .limit(1);
+  const [row] = await scanSessionQuery(db).execute({ sessionId: parsed.sessionId, instituteId: auth.instituteId });
   if (!row || !isQrMacValid(parsed, row.session.qrSecret)) throw invalidQr();
   const { session } = row;
 
@@ -86,10 +113,10 @@ export async function scanQr(
   };
 
   // Mark present unless already present or set by hand — in one statement, so a scan
-  // racing with the teacher's manual change cannot overwrite it. Webhooks hear about it
-  // in the same transaction.
-  const marked = await db.transaction(async (tx) => {
-    const [updated] = await tx
+  // racing with the teacher's manual change cannot overwrite it. When a webhook listens,
+  // its event is saved in the same transaction.
+  const markPresent = (tx: DbOrTx) =>
+    tx
       .update(attendanceRecords)
       .set({ status: 'present', method: 'qr', markedAt: now, markedBy: auth.userId, reason: null, qrStep: parsed.step, deviceId, ip })
       .where(
@@ -100,45 +127,45 @@ export async function scanQr(
           or(isNull(attendanceRecords.method), eq(attendanceRecords.method, 'qr')),
         ),
       )
-      .returning();
-    if (updated) {
-      await emitEvents(
-        tx,
-        auth.instituteId,
-        'attendance.recorded',
-        async () => [
-          {
-            session: sessionRef(session, row.subject, 'open'),
-            student: (await studentRefs(tx, [auth.userId])).get(auth.userId)!,
-            status: 'present' as const,
-            // A scan only ever changes an absent mark (marks by hand are never overridden).
-            previousStatus: 'absent' as const,
-            method: 'qr' as const,
-            via: 'scan' as const,
-            markedAt: now.toISOString(),
-            reason: null,
-          },
-        ],
-        now,
-      );
-    }
-    return updated;
-  });
+      .returning({ studentId: attendanceRecords.studentId });
+  const [marked] = !(await listeningTo(db, auth.instituteId)).has('attendance.recorded')
+    ? await markPresent(db)
+    : await db.transaction(async (tx) => {
+        const updated = await markPresent(tx);
+        if (updated.length > 0) {
+          await emitEvents(
+            tx,
+            auth.instituteId,
+            'attendance.recorded',
+            async () => [
+              {
+                session: sessionRef(session, row.subject, 'open'),
+                student: (await studentRefs(tx, [auth.userId])).get(auth.userId)!,
+                status: 'present' as const,
+                // A scan only ever changes an absent mark (marks by hand are never overridden).
+                previousStatus: 'absent' as const,
+                method: 'qr' as const,
+                via: 'scan' as const,
+                markedAt: now.toISOString(),
+                reason: null,
+              },
+            ],
+            now,
+          );
+        }
+        return updated;
+      });
 
   if (marked) {
-    const [student] = await db
-      .select({ fullName: users.fullName, rollNo: students.rollNo })
-      .from(users)
-      .innerJoin(students, eq(students.userId, users.id))
-      .where(eq(users.id, auth.userId));
-    const counts = (await sessionCounts(db, [session.id])).get(session.id)!;
+    // The live screens get the student and the new counts (one query for both).
+    const [after] = await afterScanQuery(db).execute({ sessionId: session.id, studentId: auth.userId });
     await hub.publish(db, {
       type: 'marked',
       sessionId: session.id,
-      student: { id: auth.userId, fullName: student!.fullName, rollNo: student!.rollNo },
+      student: { id: auth.userId, fullName: after!.fullName, rollNo: after!.rollNo },
       status: 'present',
       method: 'qr',
-      counts,
+      counts: { present: after!.present, absent: after!.absent, excused: after!.excused, total: after!.total },
     });
     return { status: 'present', alreadyMarked: false, markedAt: now.toISOString(), session: sessionInfo };
   }
