@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 30
     services:
       scratch:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: restore
           POSTGRES_PASSWORD: restore
@@ -39,6 +39,9 @@ jobs:
       - name: Install age (encryption)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq age
       - name: Dump the database
+        # The newest pg_dump (18) can dump any older server too, so it works whichever
+        # version the Neon project runs. Errors are reported with addresses hidden: the
+        # logs of a public repository are public.
         env:
           DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
         run: |
@@ -46,14 +49,20 @@ jobs:
             echo "::error::Add the BACKUP_DATABASE_URL secret (docs/DEPLOY.md, Backups)"
             exit 1
           fi
-          docker run --rm --network host -e DATABASE_URL postgres:17-alpine \
-            sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL"' > backup.dump
+          # Accept the value however it was pasted: Neon's "psql '…'" snippet, quotes, a newline.
+          url=$(printf '%s' "$DATABASE_URL" | tr -d '\r\n' | sed -E "s/^[[:space:]]*(psql[[:space:]]+)?['\"]?//; s/['\"]?[[:space:]]*$//")
+          if ! docker run --rm --network host -e URL="$url" postgres:18-alpine \
+              sh -c 'pg_dump --format=custom --no-owner --no-privileges "$URL"' > backup.dump 2> dump-errors.txt; then
+            reason=$(sed -E 's#postgres(ql)?://[^ "]+#<database address>#g; s#[A-Za-z0-9.-]+\.neon\.tech#<neon host>#g; s#([0-9]{1,3}\.){3}[0-9]{1,3}#<ip>#g' dump-errors.txt | head -3 | tr '\n' ' ')
+            echo "::error::pg_dump failed: ${reason:-no message}"
+            exit 1
+          fi
       - name: Check it restores
         run: |
-          docker run --rm --network host -v "$PWD:/backup" postgres:17-alpine \
+          docker run --rm --network host -v "$PWD:/backup" postgres:18-alpine \
             pg_restore --no-owner --no-privileges --exit-on-error \
             --dbname=postgres://restore:restore@localhost:5432/restore /backup/backup.dump
-          rows=$(docker run --rm --network host postgres:17-alpine \
+          rows=$(docker run --rm --network host postgres:18-alpine \
             psql postgres://restore:restore@localhost:5432/restore -Atc "select count(*) from institutes")
           if [ "$rows" -lt 1 ]; then echo "::error::The restored backup has no institutes"; exit 1; fi
           echo "Restored and checked."

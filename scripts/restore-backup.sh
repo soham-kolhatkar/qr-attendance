@@ -4,7 +4,7 @@
 #
 #   scripts/restore-backup.sh qr-attendance-2026-10-18.dump.age 'postgres://user:pass@host/db?sslmode=require'
 #
-# Needs Docker (for pg_restore 17) and age (https://age-encryption.org; or set AGE=path).
+# Needs Docker (for pg_restore 18, which reads backups of any older version) and age (https://age-encryption.org; or set AGE=path).
 # The private key is read from ~/.qr-attendance/backup-key.txt (or BACKUP_KEY=path).
 set -euo pipefail
 
@@ -23,6 +23,6 @@ age=${AGE:-$(command -v age || echo "$HOME/opt/age/age")}
 
 echo "Restoring $file …"
 "$age" --decrypt --identity "$key" "$file" |
-  docker run --rm -i --network host postgres:17-alpine \
+  docker run --rm -i --network host postgres:18-alpine \
     pg_restore --no-owner --no-privileges --exit-on-error --dbname="$target"
 echo "Done. Point DATABASE_URL at this database to use it."
