@@ -1,0 +1,70 @@
+# Nightly backup of the live database, independent of the database provider.
+#
+# The dump is restored into a scratch database first, to prove it can be, then encrypted
+# for the key in ops/backup-recipients.txt (the private key is kept off GitHub, see
+# docs/DEPLOY.md) and kept as a workflow artifact for 30 days. This repository is public:
+# nothing readable may be uploaded or printed here, only the encrypted file.
+name: Database backup
+
+on:
+  schedule:
+    - cron: '30 20 * * *' # 02:00 in India
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+
+jobs:
+  backup:
+    # Forks never have the secret; don't try.
+    if: github.repository == 'soham-kolhatkar/qr-attendance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      scratch:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: restore
+          POSTGRES_PASSWORD: restore
+          POSTGRES_DB: restore
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U restore -d restore"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install age (encryption)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - name: Dump the database
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add the BACKUP_DATABASE_URL secret (docs/DEPLOY.md, Backups)"
+            exit 1
+          fi
+          docker run --rm --network host -e DATABASE_URL postgres:17-alpine \
+            sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL"' > backup.dump
+      - name: Check it restores
+        run: |
+          docker run --rm --network host -v "$PWD:/backup" postgres:17-alpine \
+            pg_restore --no-owner --no-privileges --exit-on-error \
+            --dbname=postgres://restore:restore@localhost:5432/restore /backup/backup.dump
+          rows=$(docker run --rm --network host postgres:17-alpine \
+            psql postgres://restore:restore@localhost:5432/restore -Atc "select count(*) from institutes")
+          if [ "$rows" -lt 1 ]; then echo "::error::The restored backup has no institutes"; exit 1; fi
+          echo "Restored and checked."
+      - name: Encrypt
+        run: |
+          echo "DAY=$(date -u +%F)" >> "$GITHUB_ENV"
+          age --encrypt --recipients-file ops/backup-recipients.txt --output "qr-attendance-$(date -u +%F).dump.age" backup.dump
+          rm backup.dump
+      - uses: actions/upload-artifact@v6
+        with:
+          name: database-backup-${{ env.DAY }}
+          path: qr-attendance-*.dump.age
+          retention-days: 30
+          compression-level: 0

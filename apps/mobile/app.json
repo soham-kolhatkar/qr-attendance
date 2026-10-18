@@ -2,7 +2,7 @@
   "expo": {
     "name": "QR Attendance",
     "slug": "qr-attendance",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "qrattendance",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.qrattendance.student",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#4C6EF5",
         "foregroundImage": "./assets/android-icon-foreground.png",

@@ -1,8 +1,9 @@
 import { createHash, verify as verifySignature } from 'node:crypto';
-import { and, count, desc, eq, ilike, inArray, isNotNull, ne, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, isNotNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db, DbOrTx } from '../../db/client.js';
 import { type DeviceAttestation, devices, students, units, users } from '../../db/schema.js';
 import { writeAudit } from '../../lib/audit.js';
+import { prepared } from '../../lib/prepared.js';
 import { AppError, badRequest, conflict, isUniqueViolation, notFound } from '../../lib/errors.js';
 import { assertPathInScope, type Scope, scopeCondition } from '../../lib/scope.js';
 import { containsPattern } from '../../lib/sql.js';
@@ -224,6 +225,15 @@ export async function getMyDevices(db: Db, userId: string): Promise<{ active: De
 /** What the app signs for each scan: binds the scanned code to the phone. */
 export const scanSigningMessage = (deviceId: string, qr: string) => Buffer.from(`QAS1|${deviceId}|${qr}`, 'utf8');
 
+const scanDeviceQuery = prepared((db) =>
+  db
+    .select({ id: devices.id, status: devices.status, publicKey: devices.publicKey })
+    .from(devices)
+    .where(and(eq(devices.id, sql.placeholder('id')), eq(devices.userId, sql.placeholder('userId'))))
+    .limit(1)
+    .prepare('scan_device'),
+);
+
 /** Checks that a scan was signed by the student's linked phone. Returns the device id. */
 export async function verifyScanDevice(
   db: Db,
@@ -231,11 +241,7 @@ export async function verifyScanDevice(
   proof: { id: string; signature: string },
   qr: string,
 ): Promise<string> {
-  const [device] = await db
-    .select({ id: devices.id, status: devices.status, publicKey: devices.publicKey })
-    .from(devices)
-    .where(and(eq(devices.id, proof.id), eq(devices.userId, userId)))
-    .limit(1);
+  const [device] = await scanDeviceQuery(db).execute({ id: proof.id, userId });
   if (!device) {
     throw new AppError(403, 'DEVICE_NOT_LINKED', "This phone isn't linked to your account. Open the app again to link it.");
   }

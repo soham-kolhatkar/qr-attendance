@@ -95,6 +95,15 @@ const envSchema = z.object({
     ctx.addIssue({ code: 'custom', message: "Must be the Firebase service account's JSON key (or that JSON base64-encoded)" });
     return z.NEVER;
   }),
+  /**
+   * Where to email the platform owner about server errors and stalled background work
+   * (comma-separated; at most one email an hour). Sent through the email provider above.
+   */
+  ALERT_EMAIL: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean))
+    .pipe(z.array(z.email('Each ALERT_EMAIL entry must be an email address'))),
   /** Requests a minute each API key may make (per server). */
   API_KEY_RATE_LIMIT: z.coerce.number().int().min(1).default(600),
   /**

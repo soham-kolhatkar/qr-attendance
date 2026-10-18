@@ -1,0 +1,78 @@
+# Checks every push and pull request. Render deploys master only after this passes
+# (render.yaml: autoDeployTrigger: checksPass).
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-and-web:
+    name: API and web app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: qra
+          POSTGRES_PASSWORD: qra
+          POSTGRES_DB: qr_attendance_test
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U qra -d qr_attendance_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Known vulnerabilities in what runs in production
+        run: npm audit --omit=dev --audit-level=high
+      - name: Type checks
+        run: npm run api:typecheck && npm run typecheck -w apps/web
+      - name: API tests
+        run: npm run api:test
+      - name: Web unit tests and build
+        run: npm run web:test && npm run web:build
+      - name: Browser tests
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium && npx playwright test
+      - name: Keep the browser tests' screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-tests
+          path: |
+            apps/web/e2e/screenshots
+            apps/web/e2e/.results
+          retention-days: 14
+          if-no-files-found: ignore
+
+  mobile:
+    name: Student app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck

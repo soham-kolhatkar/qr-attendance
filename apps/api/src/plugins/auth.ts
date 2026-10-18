@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 import { type ApiScope, institutes, type Role, users } from '../db/schema.js';
 import { AppError, forbidden, unauthorized } from '../lib/errors.js';
+import { prepared } from '../lib/prepared.js';
 import { requestContext } from '../lib/request-context.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { authenticateApiKey, looksLikeApiKey, overRateLimit, rateLimited } from '../modules/integration/keys.js';
@@ -30,6 +31,23 @@ declare module 'fastify' {
   }
 }
 
+/** Runs on every signed-in request. */
+const accountQuery = prepared((db) =>
+  db
+    .select({
+      id: users.id,
+      role: users.role,
+      instituteId: users.instituteId,
+      status: users.status,
+      instituteStatus: institutes.status,
+    })
+    .from(users)
+    .leftJoin(institutes, eq(institutes.id, users.instituteId))
+    .where(eq(users.id, sql.placeholder('id')))
+    .limit(1)
+    .prepare('auth_account'),
+);
+
 /**
  * Verifies the bearer token, then re-reads the user from the database so that a
  * disabled user, suspended institute or changed role takes effect immediately rather
@@ -44,18 +62,7 @@ async function authenticate(request: FastifyRequest, reply: FastifyReply): Promi
   const claims = await verifyAccessToken(token, request.server.config.JWT_SECRET);
   if (!claims) throw unauthorized('Session expired or invalid', 'TOKEN_INVALID');
 
-  const [row] = await request.server.db
-    .select({
-      id: users.id,
-      role: users.role,
-      instituteId: users.instituteId,
-      status: users.status,
-      instituteStatus: institutes.status,
-    })
-    .from(users)
-    .leftJoin(institutes, eq(institutes.id, users.instituteId))
-    .where(eq(users.id, claims.sub))
-    .limit(1);
+  const [row] = await accountQuery(request.server.db).execute({ id: claims.sub });
 
   if (!row || row.status !== 'active') throw unauthorized('Account is disabled or no longer exists', 'ACCOUNT_INACTIVE');
   if (row.instituteId && row.instituteStatus !== 'active') {

@@ -145,6 +145,28 @@ export async function closedSessionData(db: DbOrTx, s: SessionRow): Promise<Even
 }
 
 /**
+ * Which events an institute's enabled webhooks want, remembered for a few seconds: every
+ * scan asks, and almost always the answer is "none". Changes made on this server apply
+ * at once (see forgetListeners); other servers notice within LISTENER_TTL_MS.
+ */
+const LISTENER_TTL_MS = 10_000;
+const listeners = new Map<string, { at: number; types: Set<string> }>();
+
+export async function listeningTo(db: DbOrTx, instituteId: string): Promise<Set<string>> {
+  const cached = listeners.get(instituteId);
+  if (cached && Date.now() - cached.at < LISTENER_TTL_MS) return cached.types;
+  const rows = await db
+    .select({ events: webhookEndpoints.events })
+    .from(webhookEndpoints)
+    .where(and(eq(webhookEndpoints.instituteId, instituteId), eq(webhookEndpoints.enabled, true)));
+  const types = new Set(rows.flatMap((r) => r.events));
+  listeners.set(instituteId, { at: Date.now(), types });
+  return types;
+}
+
+export const forgetListeners = (instituteId: string) => listeners.delete(instituteId);
+
+/**
  * Queues events for every enabled endpoint of the institute that subscribed to `type`,
  * in the caller's transaction (so an event exists exactly when its change does). The
  * data is only built when someone is listening.
@@ -156,6 +178,7 @@ export async function emitEvents<T extends WebhookEvent>(
   build: () => EventData<T>[] | Promise<EventData<T>[]>,
   now: Date,
 ): Promise<void> {
+  if (!(await listeningTo(db, instituteId)).has(type)) return;
   const endpoints = await db
     .select({ id: webhookEndpoints.id })
     .from(webhookEndpoints)

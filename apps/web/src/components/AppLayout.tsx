@@ -25,6 +25,7 @@ import {
   IconHistory,
   IconMessageCheck,
   IconPlugConnected,
+  IconHeartbeat,
   IconHierarchy2,
   IconHome,
   IconId,
@@ -53,6 +54,7 @@ type NavItem = { to: string; label: string; icon: Icon; roles: Role[] };
 const NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: IconHome, roles: ['admin'] },
   { to: '/platform/institutes', label: 'Institutes', icon: IconBuildingCommunity, roles: ['platform_admin'] },
+  { to: '/platform/system', label: 'System', icon: IconHeartbeat, roles: ['platform_admin'] },
   { to: '/classes', label: 'My classes', icon: IconChalkboard, roles: ['admin', 'hod', 'faculty'] },
   { to: '/sessions', label: 'Sessions', icon: IconCalendarEvent, roles: ['admin', 'hod', 'faculty'] },
   { to: '/corrections', label: 'Corrections', icon: IconMessageCheck, roles: ['admin', 'hod', 'faculty'] },
