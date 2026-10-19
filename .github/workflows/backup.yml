@@ -67,9 +67,12 @@ jobs:
             echo "::error::The backup didn't restore: ${reason:-no message}"
             exit 1
           fi
-          rows=$(docker run --rm --network host postgres:18-alpine \
-            psql postgres://restore:restore@localhost:5432/restore -Atc "select count(*) from institutes")
-          if [ "$rows" -lt 1 ]; then echo "::error::The restored backup has no institutes"; exit 1; fi
+          ask() { docker run --rm --network host postgres:18-alpine psql postgres://restore:restore@localhost:5432/restore -Atc "$1"; }
+          if [ "$(ask "select to_regclass('public.institutes') is not null")" != "t" ]; then
+            echo "::error::The backed-up database has none of the app's tables: BACKUP_DATABASE_URL must be the same database as Render's DATABASE_URL"
+            exit 1
+          fi
+          if [ "$(ask "select count(*) from institutes")" -lt 1 ]; then echo "::error::The restored backup has no institutes"; exit 1; fi
           echo "Restored and checked."
       - name: Encrypt
         run: |

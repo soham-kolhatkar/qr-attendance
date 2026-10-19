@@ -253,6 +253,7 @@ good as the last time it was restored (the nightly job checks that part automati
 | A push didn't deploy | Its checks failed: GitHub → *Actions* says which test. Fix and push again |
 | *Database backup* failed: "Add the BACKUP_DATABASE_URL secret" | See *Backups*, one-time setup |
 | *Database backup* failed: "pg_dump failed: … password authentication failed" or "… could not translate host name" | The secret's value is wrong: paste Neon's connection string again (GitHub → Settings → Secrets → `BACKUP_DATABASE_URL` → Update) |
+| *Database backup* failed: "has none of the app's tables" | The secret points at another database: use exactly Render's `DATABASE_URL` |
 | Render's *Events* say the health check failed | The System page (or `/health`) names the problem: database unreachable, or background work stalled |
 | `Invalid environment configuration` mentioning `FCM_SERVICE_ACCOUNT` | Paste the Firebase key file's whole contents, starting with `{` |
 | `notification delivery problem` … `Brevo 401` | `BREVO_API_KEY` is wrong or was deleted in Brevo |
