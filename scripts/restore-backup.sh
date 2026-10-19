@@ -24,5 +24,5 @@ age=${AGE:-$(command -v age || echo "$HOME/opt/age/age")}
 echo "Restoring $file …"
 "$age" --decrypt --identity "$key" "$file" |
   docker run --rm -i --network host postgres:18-alpine \
-    pg_restore --no-owner --no-privileges --exit-on-error --dbname="$target"
+    pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --dbname="$target"
 echo "Done. Point DATABASE_URL at this database to use it."
